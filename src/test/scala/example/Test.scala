@@ -1,6 +1,15 @@
 package example
 
+import chisel3.{Bundle, Input, Module, Output, Bool}
 import chisel3.iotesters._
+
+class ASDF extends Module {
+  val io = IO(new Bundle{
+    val in = Input(Bool())
+    val out = Output(Bool())
+  })
+  io.out := !io.in
+}
 
 class ASDFTester(c: ASDF) extends PeekPokeTester(c) {
   poke(c.io.in, false)

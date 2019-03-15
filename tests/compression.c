@@ -54,4 +54,6 @@ int main(void)
     int success = uncompress(compressed, compressed_length, recovered);
 
     printf("Recovered \"%s\" result: %d.\n", recovered, success);
+
+    return 0;
 }

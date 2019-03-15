@@ -109,11 +109,3 @@ object Hash {
     (bytes * 0x1e35a7bd.U >> shift).asUInt()
   }
 }
-
-class ASDF extends Module {
-  val io = IO(new Bundle{
-    val in = Input(Bool())
-    val out = Output(Bool())
-  })
-  io.out := !io.in
-}
