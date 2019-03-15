@@ -1,11 +1,11 @@
 package example
 
 import chisel3._
-import freechips.rocketchip.config.{Parameters, Config}
-import freechips.rocketchip.subsystem.{WithRoccExample, WithNMemoryChannels, WithNBigCores, WithRV32}
+import freechips.rocketchip.config.{Config, Parameters}
+import freechips.rocketchip.subsystem.{WithNBigCores, WithNMemoryChannels, WithRV32, WithRoccExample}
 import freechips.rocketchip.diplomacy.{LazyModule, ValName}
 import freechips.rocketchip.devices.tilelink.BootROMParams
-import freechips.rocketchip.tile.XLen
+import freechips.rocketchip.tile.{BuildRoCC, OpcodeSet, XLen}
 import testchipip._
 
 class WithBootROM extends Config((site, here, up) => {
@@ -82,3 +82,15 @@ class DualCoreConfig extends Config(
 
 class RV32ExampleConfig extends Config(
   new WithRV32 ++ new DefaultExampleConfig)
+
+class WithCompressionAccelerator extends Config((site, here, up) => {
+  case BuildRoCC => Seq(
+    (p: Parameters) => LazyModule(
+      new CompressionAccelerator(OpcodeSet.custom3)(p)
+    )
+  )
+})
+
+class CompressionAcceleratorConfig extends Config(
+  new WithCompressionAccelerator ++ new DefaultExampleConfig
+)

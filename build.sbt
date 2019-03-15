@@ -19,23 +19,11 @@ lazy val commonSettings = Seq(
     Resolver.sonatypeRepo("releases"),
     Resolver.mavenLocal))
 
-lazy val rocketchip = RootProject(file("rocket-chip"))
-
-lazy val testchipip = project.settings(commonSettings)
-  .dependsOn(rocketchip)
-
-// Checks for -DROCKET_USE_MAVEN.
-// If it's there, use a maven dependency.
-// Else, depend on subprojects in git submodules.
 def conditionalDependsOn(prj: Project): Project = {
-  if (true/*sys.props.contains("ROCKET_USE_MAVEN")*/) {
-    prj.settings(Seq(
-      libraryDependencies += "edu.berkeley.cs" %% "testchipip" % "1.0-031419-SNAPSHOT",
-      libraryDependencies += "edu.berkeley.cs" %% "chisel-iotesters" % "1.3-031419-SNAPSHOT",
-    ))
-  } else {
-    prj.dependsOn(testchipip)
-  }
+  prj.settings(Seq(
+    libraryDependencies += "edu.berkeley.cs" %% "testchipip" % "1.0-031419-SNAPSHOT",
+    libraryDependencies += "edu.berkeley.cs" %% "chisel-iotesters" % "1.3-031419-SNAPSHOT",
+  ))
 }
 
 lazy val example = conditionalDependsOn(project in file("."))
