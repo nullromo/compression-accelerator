@@ -28,14 +28,16 @@ lazy val testchipip = project.settings(commonSettings)
 // If it's there, use a maven dependency.
 // Else, depend on subprojects in git submodules.
 def conditionalDependsOn(prj: Project): Project = {
-  if (sys.props.contains("ROCKET_USE_MAVEN")) {
+  if (true/*sys.props.contains("ROCKET_USE_MAVEN")*/) {
     prj.settings(Seq(
-      libraryDependencies += "edu.berkeley.cs" %% "testchipip" % "1.0-020719-SNAPSHOT",
+      libraryDependencies += "edu.berkeley.cs" %% "testchipip" % "1.0-031419-SNAPSHOT",
+      libraryDependencies += "edu.berkeley.cs" %% "chisel-iotesters" % "1.3-031419-SNAPSHOT",
     ))
   } else {
     prj.dependsOn(testchipip)
   }
 }
+
 lazy val example = conditionalDependsOn(project in file("."))
   .settings(commonSettings)
 
