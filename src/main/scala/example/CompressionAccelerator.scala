@@ -58,11 +58,6 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator)(implicit p: Pa
   val hash      = RegInit( 0.U(32.W))
   val bbhl      = RegInit( 0.U(32.W))
 
-
-
-  printf("Compare:\t%d\t%d\n", next_ip, next_hash)
-
-
   // state machine
   when(state === sLookForMatch) {
     ip := next_ip
@@ -83,6 +78,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator)(implicit p: Pa
 //     when(io.mem(next_ip) === (hashTable(next_hash) & ((-1).S(32.W)).asUInt())) {
 //       state := sEmitLiteral
 //     }
+      printf("Compare:\t%d\t%d\n", next_ip, next_hash)
     }
   }.elsewhen(state === sEmitLiteral) {
 
