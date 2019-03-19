@@ -1,9 +1,22 @@
 package example
 
-import chisel3.{Bundle, Input, Module, Output, Bool}
+import chisel3.{Bool, Bundle, Input, Module, Output}
 import chisel3.iotesters._
+import freechips.rocketchip.config.Parameters
+import freechips.rocketchip.tile.OpcodeSet
 
-class ASDF extends Module {
+object TesterArgs {
+  def apply() = {
+    Array(
+      "-fiwv",
+      "--backend-name", "treadle",
+      "--tr-write-vcd",
+      "--target-dir", "test_run_dir/creec",
+      "--top-name")
+  }
+}
+
+class ASDF(something: Int) extends Module {
   val io = IO(new Bundle{
     val in = Input(Bool())
     val out = Output(Bool())
@@ -18,17 +31,23 @@ class ASDFTester(c: ASDF) extends PeekPokeTester(c) {
 }
 
 class Tests extends ChiselFlatSpec {
-  val testerArgs = Array(
-    "-fiwv",
-    "--backend-name", "treadle",
-    "--tr-write-vcd",
-    "--target-dir", "test_run_dir/creec",
-    "--top-name")
-
   "ASDF" should "do something" in {
-    Driver.execute(testerArgs :+ "ASDF", () => new ASDF) {
+    Driver.execute(TesterArgs() :+ "ASDF", () => new ASDF(5)) {
       c =>
       new ASDFTester(c)
     } should be(true)
+  }
+}
+
+class CompressionAcceleratorTester(c: CompressionAcceleratorModule) extends PeekPokeTester(c) {
+
+}
+
+class CompressionAcceleratorSpec extends ChiselFlatSpec {
+  implicit val p: Parameters.type = Parameters
+  "CompressionAccelerator" should "accept commands" in {
+    Driver.execute(TesterArgs() :+ "CompressionAccelerator", () => new CompressionAcceleratorModule(new CompressionAccelerator(OpcodeSet.custom3))) {
+      c => new CompressionAcceleratorTester(c)
+    } should be (true)
   }
 }

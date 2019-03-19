@@ -1,111 +1,138 @@
 package example
 
-import Chisel.{Bits, Bool, Cat, Enum, Mux, Reg, SInt, UInt, when}
 import chisel3._
-import freechips.rocketchip.config.{Field, Parameters, View}
-import freechips.rocketchip.rocket.PTE
+import chisel3.util._
+import freechips.rocketchip.config.Parameters
 import freechips.rocketchip.tile._
 
-class CompressionAccelerator(opcodes: OpcodeSet)(implicit p: Parameters) extends LazyRoCC(opcodes, nPTWPorts = 1) {
+class CompressionAccelerator(opcodes: OpcodeSet)(implicit p: Parameters)
+  extends LazyRoCC(opcodes, nPTWPorts = 1) {
   override lazy val module = new CompressionAcceleratorModule(this)
 }
 
-class CompressionAcceleratorModule(outer: CompressionAccelerator)(implicit p: Parameters) extends LazyRoCCModuleImp(outer) with HasCoreParameters {
+class CompressionAcceleratorModule(outer: CompressionAccelerator)(implicit p: Parameters)
+  extends LazyRoCCModuleImp(outer) with HasCoreParameters {
+  //TODO: change all the magic numbers to parameters
 
-  /*
-  val sIdle :: sLookForMatch :: sEmitLiteral :: Nil = Enum(3)
+  // STATE MACHINE
+  //          sIdle: waiting for a RoCC command
+  //  sLookForMatch: searching for a 4-byte match
+  //   sEmitLiteral: feed the literal opcode and data to the output
+  // sEmitRemainder: emit the end of a stream as a literal
+  val sIdle :: sLookForMatch :: sEmitLiteral :: sEmitRemainder :: Nil = Enum(4)
   val state = RegInit(sIdle)
 
+  // get the RoCC command
   val cmd = Queue(io.cmd)
-  val doCompress: Bool = cmd.bits.inst.funct === UInt(0)
-  val doUncompress: Bool = cmd.bits.inst.funct === UInt(1)
-  val doSetLength: Bool = cmd.bits.inst.funct === UInt(2)
 
+  // which operation is the command telling us to do?
+  val doCompress: Bool = cmd.bits.inst.funct === 0.U
+  val doUncompress: Bool = cmd.bits.inst.funct === 1.U
+  val doSetLength: Bool = cmd.bits.inst.funct === 2.U
+
+  // register to hold the length field given by the setLength command
   val length = RegInit(0.U(32.W))
+
+  // registers to hold the source and destination addresses for the compress and uncompress commands
+  val src = RegInit(0.U(32.W))
+  val dst = RegInit(0.U(32.W))
+
+  // register that drives the busy signal to tell the CPU that the accelerator is busy
   val busy = RegInit(false.B)
 
-  //256-entry table, data is 16 bits for offset and 32 bits for value
+  // 256-entry table, data is 16 bits for offset and 32 bits for value
   val hashTable = Mem(256, UInt(48.W))
 
-  //when cmd fires, kick off the state machine
-  when(cmd.fire()) {
-    when(doSetLength) {
-      length := cmd.bits.rs1
-    }.elsewhen(doCompress) {
-      busy := true.B
-      state := sLookForMatch
-    }.elsewhen(doUncompress) {
-      busy := true.B
-      // ...
+  // components for sLookForMatch
+  val ip        = RegInit( 0.U(32.W))
+  val shift: UInt = (32 - log2Floor(256)).U
+  val ip_end    = RegInit( 0.U(32.W))
+  val base_ip   = RegInit( 0.U(32.W))
+  val next_emit = RegInit( 0.U(32.W))
+  val kInputMarginBytes: UInt = 15.U
+  val ip_limit  = RegInit( 0.U(32.W))
+  val next_hash = RegInit( 0.U(32.W))
+  val skip      = RegInit(32.U(32.W))
+  val next_ip   = RegInit( 0.U(32.W))
+  val candidate = RegInit( 0.U(32.W))
+  val hash      = RegInit( 0.U(32.W))
+  val bbhl      = RegInit( 0.U(32.W))
+
+
+
+  printf("Compare:\t%d\t%d\n", next_ip, next_hash)
+
+
+  // state machine
+  when(state === sLookForMatch) {
+    ip := next_ip
+    hash := next_hash
+    bbhl := (skip >> 5.U).asUInt()
+    skip := skip + (skip >> 5.U).asUInt()
+    next_ip := next_ip + (skip >> 5.U).asUInt()
+    when(next_ip > ip_limit) {
+      state := sEmitRemainder
+    }.otherwise {
+      next_hash := Hash(next_ip + (skip >> 5.U).asUInt(), shift)
+      //TODO: make the table also store the data
+//      candidate := base_ip + (hashTable(next_hash) >> 32.U).asUInt()
+      candidate := base_ip + hashTable(next_hash)
+//      hashTable(next_hash) := (((next_ip - base_ip) << 32.U).asUInt() | io.mem(next_ip - base_ip)).asUInt()
+      hashTable(next_hash) := next_ip - base_ip
+      //TODO: figure out how to access the memory
+//     when(io.mem(next_ip) === (hashTable(next_hash) & ((-1).S(32.W)).asUInt())) {
+//       state := sEmitLiteral
+//     }
+    }
+  }.elsewhen(state === sEmitLiteral) {
+
+  }.elsewhen(state === sEmitRemainder) {
+
+  }.otherwise /*(state === sIdle)*/ {
+    when(cmd.fire()) {
+      when(doSetLength) {
+        length := cmd.bits.rs1
+      }.elsewhen(doCompress) {
+        busy := true.B
+        src := cmd.bits.rs1
+        dst := cmd.bits.rs2
+        ip := cmd.bits.rs1 + 1.U
+        ip_end := cmd.bits.rs1 + length
+        base_ip := cmd.bits.rs1
+        next_emit := cmd.bits.rs1
+        when(length < kInputMarginBytes) {
+          state := sEmitRemainder
+        }.otherwise {
+          state := sLookForMatch
+          ip_limit := cmd.bits.rs1 + length - kInputMarginBytes
+          next_hash := Hash(cmd.bits.rs1 + 1.U, shift)
+          next_ip := cmd.bits.rs1 + 1.U
+        }
+      }.elsewhen(doUncompress) {
+        busy := true.B
+        // ...
+      }
     }
   }
 
-  //state machine for compress
-  when(state === sLookForMatch) {
 
-  }.elsewhen(state === sEmitLiteral) {
-
-  }.otherwise/*(state === sIdle)*/ {
-
-  }
 
 
   io.mem.req.valid := false.B
   io.resp.valid := false.B
   io.resp.bits.rd := io.resp.bits.rd
-  io.resp.bits.data := SInt(-1, xLen).asUInt()
+  io.resp.bits.data := (-1).S(xLen.W).asUInt()
 
 
   io.cmd.ready := !busy
   io.busy := busy
   io.interrupt := false.B
-  */
-
-  val req_addr = Reg(UInt(width = coreMaxAddrBits))
-  val req_rd = Reg(io.resp.bits.rd)
-  val req_offset = req_addr(pgIdxBits - 1, 0)
-  val req_vpn = req_addr(coreMaxAddrBits - 1, pgIdxBits)
-  val pte = Reg(new PTE)
-
-  val s_idle :: s_ptw_req :: s_ptw_resp :: s_resp :: Nil = Enum(Bits(), 4)
-  val state = Reg(init = s_idle)
-
-  io.cmd.ready := (state === s_idle)
-
-  when (io.cmd.fire()) {
-    req_rd := io.cmd.bits.inst.rd
-    req_addr := io.cmd.bits.rs1
-    state := s_ptw_req
-  }
-
-  private val ptw = io.ptw(0)
-
-  when (ptw.req.fire()) { state := s_ptw_resp }
-
-  when (state === s_ptw_resp && ptw.resp.valid) {
-    pte := ptw.resp.bits.pte
-    state := s_resp
-  }
-
-  when (io.resp.fire()) { state := s_idle }
-
-  ptw.req.valid := (state === s_ptw_req)
-  ptw.req.bits.valid := true.B
-  ptw.req.bits.bits.addr := req_vpn
-
-  io.resp.valid := (state === s_resp)
-  io.resp.bits.rd := req_rd
-  io.resp.bits.data := Mux(pte.leaf(), Cat(pte.ppn, req_offset), SInt(-1, xLen).asUInt)
-
-  io.busy := (state =/= s_idle)
-  io.interrupt := Bool(false)
-  io.mem.req.valid := Bool(false)
 
 
 }
 
 object Hash {
-  def apply(bytes: UInt, shift: UInt):UInt = {
+  def apply(bytes: UInt, shift: UInt): UInt = {
     (bytes * 0x1e35a7bd.U >> shift).asUInt()
   }
 }
