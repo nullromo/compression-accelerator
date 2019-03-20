@@ -5,7 +5,8 @@ import freechips.rocketchip.config.{Config, Parameters}
 import freechips.rocketchip.subsystem.{WithNBigCores, WithNMemoryChannels, WithRV32, WithRoccExample}
 import freechips.rocketchip.diplomacy.{LazyModule, ValName}
 import freechips.rocketchip.devices.tilelink.BootROMParams
-import freechips.rocketchip.tile.{BuildRoCC, OpcodeSet, XLen}
+import freechips.rocketchip.rocket.HasRocketCoreParameters
+import freechips.rocketchip.tile.{BuildRoCC, HasCoreParameters, OpcodeSet, XLen}
 import testchipip._
 
 class WithBootROM extends Config((site, here, up) => {

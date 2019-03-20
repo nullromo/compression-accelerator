@@ -2,7 +2,7 @@ package example
 
 import chisel3._
 import chisel3.util._
-import freechips.rocketchip.config.Parameters
+import freechips.rocketchip.config.{Field, Parameters, View}
 import freechips.rocketchip.tile._
 
 class CompressionAccelerator(opcodes: OpcodeSet)(implicit p: Parameters)
@@ -78,7 +78,8 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator)(implicit p: Pa
 //     when(io.mem(next_ip) === (hashTable(next_hash) & ((-1).S(32.W)).asUInt())) {
 //       state := sEmitLiteral
 //     }
-      printf("Compare:\t%d\t%d\n", next_ip, next_hash)
+//      printf("Compare:\t%d\t%d\n", next_ip, next_hash)
+      printf("does this work at least?")
     }
   }.elsewhen(state === sEmitLiteral) {
 
@@ -116,11 +117,10 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator)(implicit p: Pa
 
   io.mem.req.valid := false.B
   io.resp.valid := false.B
-  io.resp.bits.rd := io.resp.bits.rd
+  io.resp.bits.rd := RegNext(io.resp.bits.rd)
   io.resp.bits.data := (-1).S(xLen.W).asUInt()
 
-
-  io.cmd.ready := !busy
+  cmd.ready := !busy
   io.busy := busy
   io.interrupt := false.B
 

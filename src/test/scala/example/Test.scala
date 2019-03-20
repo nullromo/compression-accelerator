@@ -1,9 +1,11 @@
 package example
 
-import chisel3.{Bool, Bundle, Input, Module, Output}
 import chisel3.iotesters._
+import chisel3.{Bool, Bundle, Input, Module, Output}
 import freechips.rocketchip.config.Parameters
+import freechips.rocketchip.diplomacy.LazyModule
 import freechips.rocketchip.tile.OpcodeSet
+
 
 object TesterArgs {
   def apply() = {
@@ -17,7 +19,7 @@ object TesterArgs {
 }
 
 class ASDF(something: Int) extends Module {
-  val io = IO(new Bundle{
+  val io = IO(new Bundle {
     val in = Input(Bool())
     val out = Output(Bool())
   })
@@ -34,7 +36,7 @@ class Tests extends ChiselFlatSpec {
   "ASDF" should "do something" in {
     Driver.execute(TesterArgs() :+ "ASDF", () => new ASDF(5)) {
       c =>
-      new ASDFTester(c)
+        new ASDFTester(c)
     } should be(true)
   }
 }
@@ -44,10 +46,13 @@ class CompressionAcceleratorTester(c: CompressionAcceleratorModule) extends Peek
 }
 
 class CompressionAcceleratorSpec extends ChiselFlatSpec {
-  implicit val p: Parameters.type = Parameters
+  implicit val p: Parameters = (new DefaultExampleConfig).toInstance
+  val dut = LazyModule(new CompressionAccelerator(OpcodeSet.custom3))
   "CompressionAccelerator" should "accept commands" in {
-    Driver.execute(TesterArgs() :+ "CompressionAccelerator", () => new CompressionAcceleratorModule(new CompressionAccelerator(OpcodeSet.custom3))) {
+    Driver.execute(TesterArgs() :+ "CompressionAccelerator", () => dut.module) {
       c => new CompressionAcceleratorTester(c)
     } should be (true)
   }
 }
+
+
