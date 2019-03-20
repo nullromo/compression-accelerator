@@ -90,6 +90,7 @@ class WithCompressionAccelerator extends Config((site, here, up) => {
       new CompressionAccelerator(OpcodeSet.custom3)(p)
     )
   )
+  case BootROMParams => BootROMParams(contentFileName = "./rocket-chip/bootrom/bootrom.img")
 })
 
 class CompressionAcceleratorConfig extends Config(
