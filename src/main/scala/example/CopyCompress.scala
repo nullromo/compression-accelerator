@@ -37,8 +37,10 @@ class CopyCompress (val params: CopyCompressParams) extends Module{
 
     val lengthAccum = RegInit(0.U(6.W)) // the maximum encoded length is 64 bytes
     val start_reg = RegInit(false.B)
-    val num_candidate_valid = Wire(UInt((log2Ceil(params.parallellane)+1).U))
-    val num_data_valid = Wire(UInt((log2Ceil(params.parallellane)+1).U))
+    val candidate_valid = Wire(Vec(params.parallellane, UInt(1.W)))
+    val data_valid = Wire(Vec(params.parallellane, UInt(1.W)))
+    val num_candidate_valid = Wire(UInt((log2Ceil(params.parallellane)+1).W))
+    val num_data_valid = Wire(UInt((log2Ceil(params.parallellane)+1).W))
 
     val compareResult = Wire(Vec(params.parallellane, Bool()))
 
@@ -47,14 +49,19 @@ class CopyCompress (val params: CopyCompressParams) extends Module{
     val maxLength:Int = pow(2,6).toInt
 
 
-    when(hit){
+    when(io.hit){
         start_reg := true.B
         lengthAccum := 0.U
     }
-    when(~equal) start_reg := false.B
+    when(~io.equal){ 
+      start_reg := false.B
+    }
 
-    num_candidate_valid := io.candidate.valid.reduce(_+_)
-    num_data_valid := io.data.valid.reduce(_+_)
+    (io.candidate zip candidate_valid).foreach{case(a,b) => b := a.valid.asUInt }
+    (io.data zip data_valid).foreach{case(a,b) => b := a.valid.asUInt}
+
+    num_candidate_valid := candidate_valid.reduce(_+_)
+    num_data_valid := data_valid.reduce(_+_)
 
     // ******** Do comparison ***************
     for(i <- 0 until params.parallellane){
@@ -74,7 +81,7 @@ class CopyCompress (val params: CopyCompressParams) extends Module{
     // flag indicating whether the compression reaches the end
     reachEnd := (num_data_valid === 0.U) && (io.remain === 0.U)
     
-    when(start_reg & io.copyStreamFormer.start.ready){
+    when(start_reg & copyStreamFormer.io.start.ready){
 
         io.bufferPtrInc.bits := 0.U // default value
         io.bufferPtrInc.valid := false.B
@@ -86,7 +93,7 @@ class CopyCompress (val params: CopyCompressParams) extends Module{
         when(num_candidate_valid >= num_data_valid && ~reachEnd){
             for(i <- 0 until params.parallellane){
                 when(compareResult.asUInt >= (pow(2,i+1).toInt - 1).U ){
-                    when(lengthAccum < maxLength && ((lengthAccum + i.U) <= maxLength)){ // 6-bits represents 1-64 same bytes not 0-63
+                    when(lengthAccum < maxLength.U  && ((lengthAccum + i.U) <= maxLength.U)){ // 6-bits represents 1-64 same bytes not 0-63
                         io.bufferPtrInc.bits := (i+1).U
                     }
                 }
@@ -123,8 +130,8 @@ class CopyCompress (val params: CopyCompressParams) extends Module{
         io.bufferPtrInc.valid := false.B
     }
 
-    io.data.forall{(a) => a.ready := true.B}
-    io.candidate.forall{(a) => a.ready := true.B}
+    io.data.foreach{(a) => a.ready := true.B}
+    io.candidate.foreach{(a) => a.ready := true.B}
 
     val copyStreamFormer = Module(new CopyStreamFormer(params))
 
