@@ -1,7 +1,9 @@
 package example
 
 import chisel3._
+import chisel3.core.dontTouch
 import chisel3.util._
+import firrtl.transforms.DontTouchAnnotation
 import freechips.rocketchip.config.{Field, Parameters, View}
 import freechips.rocketchip.tile._
 
@@ -41,7 +43,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator)(implicit p: Pa
   val busy = RegInit(false.B)
 
   // 256-entry table, data is 16 bits for offset and 32 bits for value
-  val hashTable = Mem(256, UInt(48.W))
+  val hashTable = Mem(256, Vec(1, UInt(48.W)))
 
   // components for sLookForMatch
   val ip        = RegInit( 0.U(32.W))
@@ -58,6 +60,39 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator)(implicit p: Pa
   val hash      = RegInit( 0.U(32.W))
   val bbhl      = RegInit( 0.U(32.W))
 
+  dontTouch(ip)
+//  dontTouch(shift)
+  dontTouch(ip_end)
+  dontTouch(base_ip)
+  dontTouch(next_emit)
+//  dontTouch(kInputMarginBytes)
+  dontTouch(ip_limit)
+  dontTouch(next_hash)
+  dontTouch(skip)
+  dontTouch(next_ip)
+  dontTouch(candidate)
+  dontTouch(hash)
+  dontTouch(bbhl)
+
+  val hashTableReadAddress: UInt = Wire(UInt(log2Ceil(256).W))
+  val hashTableReadData: UInt = Wire(UInt(48.W))
+  val hashTableWriteAddress: UInt = Wire(UInt(log2Ceil(256).W))
+  val hashTableWriteData: Vec[UInt] = Wire(Vec(1, UInt(48.W)))
+  val hashTableWriteEnable: Vec[Bool] = Wire(Vec(1, Bool()))
+
+  hashTableWriteEnable(0) := false.B
+  hashTableWriteAddress := 0.U
+  hashTableWriteData(0) := 0.U
+  hashTableReadAddress := 0.U
+  hashTable.write(hashTableWriteAddress, hashTableWriteData, hashTableWriteEnable)
+  hashTableReadData := hashTable.read(hashTableReadAddress)(0)
+
+  dontTouch(hashTableReadAddress)
+  dontTouch(hashTableReadData)
+  dontTouch(hashTableWriteAddress)
+  dontTouch(hashTableWriteData)
+  dontTouch(hashTableWriteEnable)
+
   // state machine
   when(state === sLookForMatch) {
     ip := next_ip
@@ -71,15 +106,18 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator)(implicit p: Pa
       next_hash := Hash(next_ip + (skip >> 5.U).asUInt(), shift)
       //TODO: make the table also store the data
 //      candidate := base_ip + (hashTable(next_hash) >> 32.U).asUInt()
-      candidate := base_ip + hashTable(next_hash)
+      hashTableReadAddress := next_hash
+      candidate := base_ip + hashTableReadData
 //      hashTable(next_hash) := (((next_ip - base_ip) << 32.U).asUInt() | io.mem(next_ip - base_ip)).asUInt()
-      hashTable(next_hash) := next_ip - base_ip
+      hashTableWriteEnable(0) := true.B
+      hashTableWriteAddress := next_hash
+      hashTableWriteData(0) := next_ip - base_ip
       //TODO: figure out how to access the memory
 //     when(io.mem(next_ip) === (hashTable(next_hash) & ((-1).S(32.W)).asUInt())) {
 //       state := sEmitLiteral
 //     }
-//      printf("Compare:\t%d\t%d\n", next_ip, next_hash)
-      printf("does this work at least?")
+//      printf("Compare:\t%d", next_ip)
+//      printf("\t%d\n", next_hash)
     }
   }.elsewhen(state === sEmitLiteral) {
 

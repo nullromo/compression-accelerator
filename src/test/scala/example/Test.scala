@@ -6,9 +6,16 @@ import freechips.rocketchip.diplomacy.LazyModule
 import freechips.rocketchip.tile.OpcodeSet
 
 class CompressionAcceleratorTester(c: CompressionAcceleratorModule) extends PeekPokeTester(c) {
-  //TODO: this is nonsense
-  poke(c.io.cmd.bits.rs2, 0)
-  step(2)
+  // set length
+  poke(c.io.cmd.bits.inst.funct, 2) // doSetLength
+  poke(c.io.cmd.bits.rs1, 100) // length = 100
+  poke(c.io.cmd.valid, true) // fire
+  step(1)
+  // compress
+  poke(c.io.cmd.bits.inst.funct, 0) // doCompress
+  poke(c.io.cmd.bits.rs1, 0) // src = 0
+  poke(c.io.cmd.bits.rs2, 100) // dst = 100
+  step(100)
   expect(peek(c.io.interrupt) != 277, "I should have passed ;(")
 }
 
