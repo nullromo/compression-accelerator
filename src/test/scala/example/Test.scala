@@ -1,5 +1,6 @@
 package example
 
+import chisel3.{Driver => _, _}
 import chisel3.iotesters._
 import freechips.rocketchip.config.Parameters
 import freechips.rocketchip.diplomacy.LazyModule
@@ -30,3 +31,4 @@ class CompressionAcceleratorSpec extends ChiselFlatSpec {
     } should be(true)
   }
 }
+
