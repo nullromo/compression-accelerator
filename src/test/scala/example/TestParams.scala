@@ -4,7 +4,7 @@ import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.system._
 
 /**
-  * Specify command-line type parameters for running the tests
+  * Specify command-line type parameters for running the tests.
   */
 object TesterArgs {
   def apply() = {

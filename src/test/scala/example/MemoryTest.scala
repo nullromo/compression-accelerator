@@ -16,8 +16,17 @@ class MemoryTester(c: MemoryTestModule) extends PeekPokeTester(c) {
     write(a, d)
 
   // read back all the data
-  for ((_, a) <- writeData.zipWithIndex)
-    read(a)
+//  for ((_, a) <- writeData.zipWithIndex)
+//    read(a)
+
+  // read a write simultaneously
+  poke(c.io.writeAddress, 0)
+  poke(c.io.writeData(0), 700)
+  poke(c.io.writeEnable(0), true)
+  poke(c.io.readAddress, 1)
+  println("Before step " + peek(c.io.readAddress) + ":" + peek(c.io.readData))
+  step(1)
+  println("After step " + peek(c.io.readAddress) + ":" + peek(c.io.readData))
 
   /**
     * Writes some data at some address.
@@ -41,6 +50,7 @@ class MemoryTester(c: MemoryTestModule) extends PeekPokeTester(c) {
     println("Reading " + address + ":" + data)
     expect(data == writeData(address), "Data out was not data in.")
   }
+
 }
 
 /**
@@ -56,7 +66,7 @@ class MemoryTesterSpec extends ChiselFlatSpec {
 }
 
 /**
-  * Parameters for basic Mem module.
+  * Parameters for basic memory module.
   *
   * @param numEntries number of entries in the memory.
   * @param dataWidth  number of data bits.
@@ -67,7 +77,7 @@ case class MemoryTestParameters(numEntries: Int, dataWidth: Int, syncRead: Boole
 }
 
 /**
-  * Basic module that just instantiates a Mem.
+  * Basic module that instantiates a memory.
   */
 case class MemoryTestModule(p: MemoryTestParameters) extends Module {
   val io = IO(new Bundle {
