@@ -2,21 +2,20 @@ package example
 
 import chisel3.{Driver => _, _}
 import chisel3.iotesters._
-import chisel3.util.log2Ceil
 
 /**
   * Tester for memory tester.
   */
-class MemoryTester(c: MemoryTestModule) extends PeekPokeTester(c) {
+class MemoryTester(c: BypassEnableMem) extends PeekPokeTester(c) {
   // create some dummy data
-  val writeData: Seq[Int] = Seq(123, 1, 5, 18, 99, 23, 7, 6)
+  val sampleData: Seq[Int] = Seq(123, 1, 5, 18, 99, 23, 7, 6)
 
   // put the data into the memory
-  for ((d, a) <- writeData.zipWithIndex)
+  for ((d, a) <- sampleData.zipWithIndex)
     write(a, d)
 
   // read back all the data
-//  for ((_, a) <- writeData.zipWithIndex)
+//  for ((_, a) <- sampleData.zipWithIndex)
 //    read(a)
 
   // read a write simultaneously
@@ -48,7 +47,7 @@ class MemoryTester(c: MemoryTestModule) extends PeekPokeTester(c) {
       step(1)
     val data = peek(c.io.readData)
     println("Reading " + address + ":" + data)
-    expect(data == writeData(address), "Data out was not data in.")
+    expect(data == sampleData(address), "Data out was not data in.")
   }
 
 }
@@ -57,43 +56,10 @@ class MemoryTester(c: MemoryTestModule) extends PeekPokeTester(c) {
   * Spec for memory tester.
   */
 class MemoryTesterSpec extends ChiselFlatSpec {
-  val dutGen: () => MemoryTestModule = () => MemoryTestModule(MemoryTestParameters(256, 48, syncRead = false))
+  val dutGen: () => BypassEnableMem = () => BypassEnableMem(BypassEnableMemParameters(256, 48, syncRead = false, bypass = false))
   "MemoryTest" should "work properly" in {
     Driver.execute(TesterArgs() :+ "MemoryTest", dutGen) {
       c => new MemoryTester(c)
     } should be(true)
   }
-}
-
-/**
-  * Parameters for basic memory module.
-  *
-  * @param numEntries number of entries in the memory.
-  * @param dataWidth  number of data bits.
-  * @param syncRead   whether or not the data comes out when the read address changes or one cycle later.
-  */
-case class MemoryTestParameters(numEntries: Int, dataWidth: Int, syncRead: Boolean) {
-  val addressWidth = log2Ceil(numEntries)
-}
-
-/**
-  * Basic module that instantiates a memory.
-  */
-case class MemoryTestModule(p: MemoryTestParameters) extends Module {
-  val io = IO(new Bundle {
-    val readAddress = Input(UInt(p.addressWidth.W))
-    val readData = Output(UInt(p.dataWidth.W))
-    val writeAddress = Input(UInt(p.addressWidth.W))
-    val writeData = Input(Vec(1, UInt(p.dataWidth.W)))
-    val writeEnable = Input(Vec(1, Bool()))
-  })
-
-  val mem: MemBase[Vec[UInt]] =
-    if (p.syncRead) {
-      SyncReadMem(p.numEntries, Vec(1, UInt(p.dataWidth.W)))
-    } else {
-      Mem(p.numEntries, Vec(1, UInt(p.dataWidth.W)))
-    }
-  mem.write(io.writeAddress, io.writeData, io.writeEnable)
-  io.readData := mem.read(io.readAddress)(0)
 }
