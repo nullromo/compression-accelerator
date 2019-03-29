@@ -49,7 +49,6 @@ class MemoryTester(c: BypassEnableMem) extends PeekPokeTester(c) {
     println("Reading " + address + ":" + data)
     expect(data == sampleData(address), "Data out was not data in.")
   }
-
 }
 
 /**

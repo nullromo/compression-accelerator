@@ -16,6 +16,8 @@ class CompressionAcceleratorTester(c: CompressionAcceleratorModule) extends Peek
   poke(c.io.cmd.bits.inst.funct, 0) // doCompress
   poke(c.io.cmd.bits.rs1, 0) // src = 0
   poke(c.io.cmd.bits.rs2, 100) // dst = 100
+  step(1)
+  poke(c.io.cmd.valid, false)
   step(100)
   expect(peek(c.io.interrupt) != 277, "I should have passed ;(")
 }

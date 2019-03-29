@@ -119,22 +119,24 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator)(implicit p: Pa
     }
   }.elsewhen(state === sEmitLiteral) {
     when(n > 0.U) {
-    // n > 0 means we are emitting the tag byte(s) and n > 60
+      // n > 0 means we are emitting the tag byte(s) and n > 60
       //TODO: figure out how to access the memory
-//    io.mem(op) = n & 0xFF.U
+      //    io.mem(op) = n & 0xFF.U
       op := op + 1.U
       n := (n >> 8.U).asUInt()
       count := count + 1.U
       when((n >> 8.U).asUInt() <= 0.U) {
         // we have reached the end of the tag bytes
         //TODO: figure out how to access the memory
-//      io.mem(base) = ((count + 59.U) << 2.U).asUInt()
+        //      io.mem(base) = ((count + 59.U) << 2.U).asUInt()
       }
     }.otherwise {
-    // n <= 0 means we are just copying data
+      // n <= 0 means we are just copying data
       //TODO: copy (next_emit - next_ip) bytes from next_emit to op and
       // set op = op + (next_emit - next_ip)
     }
+  }.elsewhen(state === sEmitCopy) {
+
   }.elsewhen(state === sEmitRemainder) {
 
   }.otherwise /*(state === sIdle)*/ {
