@@ -64,6 +64,9 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator)(implicit p: Pa
   val hash      = RegInit( 0.U(32.W))
   val bbhl      = RegInit( 0.U(32.W))
   val op        = RegInit( 0.U(32.W))
+  val n         = RegInit( 0.U(32.W))
+  val base      = RegInit( 0.U(32.W))
+  val count     = RegInit( 0.U(32.W))
   dontTouch(ip)
   dontTouch(ip_end)
   dontTouch(base_ip)
@@ -76,6 +79,8 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator)(implicit p: Pa
   dontTouch(hash)
   dontTouch(bbhl)
   dontTouch(op)
+  dontTouch(base)
+  dontTouch(count)
 
   // state machine
   when(state === sLookForMatch) {
@@ -98,17 +103,45 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator)(implicit p: Pa
       printf("Compare:  mem[%d]  mem[%d]\n", candidate, next_ip)
 
       //TODO: figure out how to access the memory
-//     when(io.mem(next_ip) === io.mem(candidate)) {
-//       state := sEmitLiteral
-//     }
+//    when(io.mem(next_ip) === io.mem(candidate)) {
+//      state := sEmitLiteral
+//    }
 
       // pretend mem(7) === mem(0) TODO: [remove me]
       when(next_ip === 7.U) {
         state := sEmitLiteral
+        count := 0.U
+        base := op
+        when(next_ip - next_emit > 60.U) {
+          // length > 60 means we need to emit the the length partly as additional bytes after the tag, so we do that in the next state
+          n := next_ip - next_emit - 1.U
+        }.otherwise {
+          // length <= 60 means we can encode the length in the tag byte, so do it now and set n to 0
+          //TODO: figure out how to access the memory
+          //        io.mem(op) = (n<<2).asUInt()
+          n := 0.U
+        }
+        op := op + 1.U
       }
     }
   }.elsewhen(state === sEmitLiteral) {
-    
+    when(n > 0.U) {
+    // n > 0 means we are emitting the tag byte(s) and n > 60
+      //TODO: figure out how to access the memory
+//    io.mem(op) = n & 0xFF.U
+      op := op + 1.U
+      n := (n >> 8.U).asUInt()
+      count := count + 1.U
+      when((n >> 8.U).asUInt() <= 0.U) {
+        // we have reached the end of the tag bytes
+        //TODO: figure out how to access the memory
+//      io.mem(base) = ((count + 59.U) << 2.U).asUInt()
+      }
+    }.otherwise {
+    // n <= 0 means we are just copying data
+      //TODO: copy (next_emit - next_ip) bytes from next_emit to op and
+      // set op = op + (next_emit - next_ip)
+    }
   }.elsewhen(state === sEmitRemainder) {
 
   }.otherwise /*(state === sIdle)*/ {
