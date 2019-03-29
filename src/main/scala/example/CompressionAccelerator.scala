@@ -44,7 +44,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator)(implicit p: Pa
   val busy = RegInit(false.B)
 
   // tableSize-entry table, data is 16 bits for offset
-  val hashTable = Module(BypassEnableMem(BypassEnableMemParameters(tableSize, 16, syncRead = false, bypass = false)))
+  val hashTable = Module(BasicMem(MemParameters(tableSize, 16, syncRead = false, bypass = false)))
   hashTable.io.writeEnable := false.B
   hashTable.io.writeAddress := 0.U
   hashTable.io.writeData := 0.U
@@ -66,6 +66,9 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator)(implicit p: Pa
   val n         = RegInit( 0.U(32.W))
   val base      = RegInit( 0.U(32.W))
   val count     = RegInit( 0.U(32.W))
+  val ip        = RegInit( 0.U(32.W))
+  val matched   = RegInit( 0.U(32.W))
+  val s2        = RegInit( 0.U(32.W))
   dontTouch(ip_end)
   dontTouch(base_ip)
   dontTouch(next_emit)
@@ -79,9 +82,13 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator)(implicit p: Pa
   dontTouch(n)
   dontTouch(base)
   dontTouch(count)
+  dontTouch(ip)
+  dontTouch(matched)
+  dontTouch(s2)
 
   // state machine
   when(state === sLookForMatch) {
+    ip := next_ip
     bbhl := (skip >> 5.U).asUInt()
     skip := skip + (skip >> 5.U).asUInt()
     next_ip := next_ip + (skip >> 5.U).asUInt()
@@ -99,7 +106,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator)(implicit p: Pa
       printf("Compare:  mem[%d]  mem[%d]\n", candidate, next_ip)
 
       //TODO: figure out how to access the memory
-//    when(io.mem(next_ip) === io.mem(candidate)) {
+//    when(io.mem(next_ip[4byte]) === io.mem(candidate[4byte])) {
       // pretend mem(7) === mem(0) TODO: [remove me]
       when(next_ip === 7.U) {
         state := sEmitLiteral
@@ -134,6 +141,12 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator)(implicit p: Pa
       // n <= 0 means we are just copying data
       //TODO: copy (next_emit - next_ip) bytes from next_emit to op and
       // set op = op + (next_emit - next_ip)
+      //when(done copying) {
+      //  state := sEmitCopy
+      //  matched := 0.U
+      //  s2 := ip + 4.U
+      //  base := ip
+      //}
     }
   }.elsewhen(state === sEmitCopy) {
 

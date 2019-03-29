@@ -6,7 +6,7 @@ import chisel3.iotesters._
 /**
   * Tester for memory tester.
   */
-class MemoryTester(c: BypassEnableMem) extends PeekPokeTester(c) {
+class MemoryTester(c: BasicMem) extends PeekPokeTester(c) {
   // create some dummy data
   val sampleData: Seq[Int] = Seq(123, 1, 5, 18, 99, 23, 7, 6)
 
@@ -55,7 +55,7 @@ class MemoryTester(c: BypassEnableMem) extends PeekPokeTester(c) {
   * Spec for memory tester.
   */
 class MemoryTesterSpec extends ChiselFlatSpec {
-  val dutGen: () => BypassEnableMem = () => BypassEnableMem(BypassEnableMemParameters(256, 48, syncRead = false, bypass = false))
+  val dutGen: () => BasicMem = () => BasicMem(MemParameters(256, 48, syncRead = false, bypass = false))
   "MemoryTest" should "work properly" in {
     Driver.execute(TesterArgs() :+ "MemoryTest", dutGen) {
       c => new MemoryTester(c)
