@@ -31,11 +31,11 @@ case class MultiPortMem(p: MemParameters, numPorts: Int) extends Module {
   })
 
   val mem = Mem(p.numEntries, Vec(1, UInt(p.bitsPerEntry.W)))
-  for(i <- 0 to numPorts) {
+  for(i <- 0 until numPorts) {
     val wrEnable: Vec[Bool] = Wire(Vec(1, Bool()))
     val wrData: Vec[UInt] = Wire(Vec(1, UInt(p.bitsPerEntry.W)))
-    wrEnable := io.writeEnable(i)
-    wrData := io.writeData(i)
+    wrEnable(0) := io.writeEnable(i)
+    wrData(0) := io.writeData(i)
     mem.write(io.writeAddress + i.U, wrData, wrEnable)
 
     io.readData(i) := mem.read(io.readAddress + i.U)(0)

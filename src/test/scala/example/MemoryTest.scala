@@ -20,8 +20,8 @@ class BasicMemoryTester(c: BasicMem) extends PeekPokeTester(c) {
 
   // read a write simultaneously
   poke(c.io.writeAddress, 0)
-  poke(c.io.writeData(0), 700)
-  poke(c.io.writeEnable(0), true)
+  poke(c.io.writeData, 700)
+  poke(c.io.writeEnable, true)
   poke(c.io.readAddress, 1)
   println("Before step " + peek(c.io.readAddress) + ":" + peek(c.io.readData))
   step(1)
@@ -32,8 +32,8 @@ class BasicMemoryTester(c: BasicMem) extends PeekPokeTester(c) {
     */
   def writeToMem(address: Int, data: Int): Unit = {
     poke(c.io.writeAddress, address)
-    poke(c.io.writeData(0), data)
-    poke(c.io.writeEnable(0), true)
+    poke(c.io.writeData, data)
+    poke(c.io.writeEnable, true)
     println("Writing " + address + ":" + data)
     step(1)
   }
@@ -52,17 +52,56 @@ class BasicMemoryTester(c: BasicMem) extends PeekPokeTester(c) {
 }
 
 class MultiPortMemoryTester(c: MultiPortMem) extends PeekPokeTester(c) {
+  // write 3 out of 4 values
   poke(c.io.writeAddress, 0)
   poke(c.io.writeData(0), 45)
   poke(c.io.writeData(1), 78)
   poke(c.io.writeData(2), 99)
   poke(c.io.writeData(3), 2)
   poke(c.io.writeEnable(0), 1)
-  poke(c.io.writeEnable(0), 0)
-  poke(c.io.writeEnable(0), 1)
-  poke(c.io.writeEnable(0), 1)
+  poke(c.io.writeEnable(1), 0)
+  poke(c.io.writeEnable(2), 1)
+  poke(c.io.writeEnable(3), 1)
   step(1)
 
+  // read back the values
+  poke(c.io.readAddress, 0)
+  val d1: BigInt = peek(c.io.readData(0))
+  val d2: BigInt = peek(c.io.readData(1))
+  val d3: BigInt = peek(c.io.readData(2))
+  val d4: BigInt = peek(c.io.readData(3))
+  println("got: " + d1 + " " + d2 + " " + d3 + " " + d4)
+  expect(d1 == 45 && d2 == 0 && d3 == 99 && d4 == 2, "Writing and reading back doesn't work.")
+  step(1)
+
+  // write over with an offset
+  poke(c.io.writeAddress, 2)
+  poke(c.io.writeData(0), 7)
+  poke(c.io.writeData(1), 18)
+  poke(c.io.writeData(2), 100)
+  poke(c.io.writeData(3), 444)
+  poke(c.io.writeEnable(0), 1)
+  poke(c.io.writeEnable(1), 0)
+  poke(c.io.writeEnable(2), 1)
+  poke(c.io.writeEnable(3), 1)
+  step(1)
+
+  // read back the values
+  poke(c.io.readAddress, 2)
+  val d5: BigInt = peek(c.io.readData(0))
+  val d6: BigInt = peek(c.io.readData(1))
+  val d7: BigInt = peek(c.io.readData(2))
+  val d8: BigInt = peek(c.io.readData(3))
+  println("got: " + d5 + " " + d6 + " " + d7 + " " + d8)
+  expect(d5 == 7 && d6 == 2 && d7 == 100 && d8 == 444, "Overwriting doesn't work.")
+  step(1)
+
+  poke(c.io.readAddress, 0)
+  val d9: BigInt = peek(c.io.readData(0))
+  val d10: BigInt = peek(c.io.readData(1))
+  println("got " + d9 + " " + d10)
+  expect(d9 == 45 && d10 == 0, "Old values not retained.")
+  step(3)
 }
 
 /**
@@ -76,10 +115,10 @@ class MemoryTesterSpec extends ChiselFlatSpec {
     } should be(true)
   }
 
-//  val dutGenMultiPort: () => MultiPortMem = () => MultiPortMem(MemParameters(256, 16, syncRead = false, bypass = false), 4)
-//  "MultiPortMemoryTester" should "work properly" in {
-//    Driver.execute(TesterArgs() :+ "MultiPortMemoryTest", dutGenMultiPort) {
-//      c => new MultiPortMemoryTester(c)
-//    } should be(true)
-//  }
+  val dutGenMultiPort: () => MultiPortMem = () => MultiPortMem(MemParameters(256, 16, syncRead = false, bypass = false), 4)
+  "MultiPortMemoryTester" should "work properly" in {
+    Driver.execute(TesterArgs() :+ "MultiPortMemoryTest", dutGenMultiPort) {
+      c => new MultiPortMemoryTester(c)
+    } should be(true)
+  }
 }
