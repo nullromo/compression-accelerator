@@ -14,50 +14,31 @@ import chisel3.util.{Cat, log2Ceil}
 case class MemParameters(numEntries: Int,
                          bitsPerEntry: Int,
                          syncRead: Boolean,
-                         bypass: Boolean,
-                         entriesPerWord: Int) {
+                         bypass: Boolean) {
   val addressWidth: Int = log2Ceil(numEntries)
-  val numWords: Int = numEntries / entriesPerWord
-  val bitsPerWord: Int = bitsPerEntry * entriesPerWord
-  require(numEntries % entriesPerWord == 0)
 }
 
 /**
-  * Memory that is structured using words.
+  * Memory with multiple read and write ports.
   */
-case class MaskedMem(p: MemParameters) extends Module {
+case class MultiPortMem(p: MemParameters, numPorts: Int) extends Module {
   val io = IO(new Bundle {
     val readAddress = Input(UInt(p.addressWidth.W))
-    val readData = Output(UInt(p.bitsPerWord.W))
+    val readData = Output(Vec(numPorts, UInt(p.bitsPerEntry.W)))
     val writeAddress = Input(UInt(p.addressWidth.W))
-    val writeData = Input(UInt(p.bitsPerWord.W))
-    val writeEnable = Input(Vec(p.entriesPerWord, Bool()))
+    val writeData = Input(Vec(numPorts, UInt(p.bitsPerEntry.W)))
+    val writeEnable = Input(Vec(numPorts, Bool()))
   })
 
-  val mem = Mem(p.numWords, Vec(p.entriesPerWord, UInt(p.bitsPerEntry.W)))
-  val rawData: Vec[UInt] = Wire(Vec(p.entriesPerWord, UInt(p.bitsPerEntry.W)))
-  val rawDataNext: Vec[UInt] = Wire(Vec(p.entriesPerWord, UInt(p.bitsPerEntry.W)))
-  rawData := mem.read(io.readAddress / p.entriesPerWord.U)
-  rawDataNext := mem.read(io.readAddress / p.entriesPerWord.U + 1.U)
-  for(i <- 0 to p.entriesPerWord) {
-    io.readData := Cat(io.readData, VectorCatGrab(io.readAddress % p.entriesPerWord.U + i.U, rawData, rawDataNext)(p.entriesPerWord, p.bitsPerEntry))
-  }
-  
+  val mem = Mem(p.numEntries, Vec(1, UInt(p.bitsPerEntry.W)))
+  for(i <- 0 to numPorts) {
+    val wrEnable: Vec[Bool] = Wire(Vec(1, Bool()))
+    val wrData: Vec[UInt] = Wire(Vec(1, UInt(p.bitsPerEntry.W)))
+    wrEnable := io.writeEnable(i)
+    wrData := io.writeData(i)
+    mem.write(io.writeAddress + i.U, wrData, wrEnable)
 
-  def VectorCatGrab(index: UInt, a: Vec[UInt], b: Vec[UInt])(length: Int, elementSize: Int): UInt = {
-    //  val io = IO(new Bundle {
-    //    val index = Input(UInt((log2Ceil(length) + 1).W))
-    //    val a = Input(Vec(length, UInt(elementSize.W)))
-    //    val b = Input(Vec(length, UInt(elementSize.W)))
-    //    val out = Output(UInt(elementSize.W))
-    //  })
-    val out = Wire(UInt(elementSize.W))
-    when(index < length.U) {
-      out := a(index)
-    }.otherwise {
-      out := b(index - length.U)
-    }
-    out
+    io.readData(i) := mem.read(io.readAddress + i.U)(0)
   }
 }
 
@@ -68,20 +49,20 @@ case class MaskedMem(p: MemParameters) extends Module {
 case class BasicMem(p: MemParameters) extends Module {
   val io = IO(new Bundle {
     val readAddress = Input(UInt(p.addressWidth.W))
-    val readData = Output(UInt(p.bitsPerWord.W))
+    val readData = Output(UInt(p.bitsPerEntry.W))
     val writeAddress = Input(UInt(p.addressWidth.W))
-    val writeData = Input(UInt(p.bitsPerWord.W))
+    val writeData = Input(UInt(p.bitsPerEntry.W))
     val writeEnable = Input(Bool())
   })
 
   val mem: MemBase[Vec[UInt]] =
     if (p.syncRead) {
-      SyncReadMem(p.numEntries, Vec(1, UInt(p.bitsPerWord.W)))
+      SyncReadMem(p.numEntries, Vec(1, UInt(p.bitsPerEntry.W)))
     } else {
-      Mem(p.numEntries, Vec(1, UInt(p.bitsPerWord.W)))
+      Mem(p.numEntries, Vec(1, UInt(p.bitsPerEntry.W)))
     }
   val wrEnable: Vec[Bool] = Wire(Vec(1, Bool()))
-  val wrData: Vec[UInt] = Wire(Vec(1, UInt(p.bitsPerWord.W)))
+  val wrData: Vec[UInt] = Wire(Vec(1, UInt(p.bitsPerEntry.W)))
   wrEnable(0) := io.writeEnable
   wrData(0) := io.writeData
   mem.write(io.writeAddress, wrData, wrEnable)

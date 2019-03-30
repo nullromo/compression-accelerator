@@ -6,17 +6,17 @@ import chisel3.iotesters._
 /**
   * Tester for memory tester.
   */
-class MemoryTester(c: BasicMem) extends PeekPokeTester(c) {
+class BasicMemoryTester(c: BasicMem) extends PeekPokeTester(c) {
   // create some dummy data
   val sampleData: Seq[Int] = Seq(123, 1, 5, 18, 99, 23, 7, 6)
 
   // put the data into the memory
   for ((d, a) <- sampleData.zipWithIndex)
-    write(a, d)
+    writeToMem(a, d)
 
   // read back all the data
-//  for ((_, a) <- sampleData.zipWithIndex)
-//    read(a)
+  //  for ((_, a) <- sampleData.zipWithIndex)
+  //    read(a)
 
   // read a write simultaneously
   poke(c.io.writeAddress, 0)
@@ -30,7 +30,7 @@ class MemoryTester(c: BasicMem) extends PeekPokeTester(c) {
   /**
     * Writes some data at some address.
     */
-  def write(address: Int, data: Int): Unit = {
+  def writeToMem(address: Int, data: Int): Unit = {
     poke(c.io.writeAddress, address)
     poke(c.io.writeData(0), data)
     poke(c.io.writeEnable(0), true)
@@ -51,14 +51,35 @@ class MemoryTester(c: BasicMem) extends PeekPokeTester(c) {
   }
 }
 
+class MultiPortMemoryTester(c: MultiPortMem) extends PeekPokeTester(c) {
+  poke(c.io.writeAddress, 0)
+  poke(c.io.writeData(0), 45)
+  poke(c.io.writeData(1), 78)
+  poke(c.io.writeData(2), 99)
+  poke(c.io.writeData(3), 2)
+  poke(c.io.writeEnable(0), 1)
+  poke(c.io.writeEnable(0), 0)
+  poke(c.io.writeEnable(0), 1)
+  poke(c.io.writeEnable(0), 1)
+  step(1)
+
+}
+
 /**
   * Spec for memory tester.
   */
 class MemoryTesterSpec extends ChiselFlatSpec {
-  val dutGen: () => BasicMem = () => BasicMem(MemParameters(256, 48, syncRead = false, bypass = false))
-  "MemoryTest" should "work properly" in {
-    Driver.execute(TesterArgs() :+ "MemoryTest", dutGen) {
-      c => new MemoryTester(c)
+  val dutGenBasic: () => BasicMem = () => BasicMem(MemParameters(256, 16, syncRead = false, bypass = false))
+  "BasicMemoryTester" should "work properly" in {
+    Driver.execute(TesterArgs() :+ "BasicMemoryTest", dutGenBasic) {
+      c => new BasicMemoryTester(c)
     } should be(true)
   }
+
+//  val dutGenMultiPort: () => MultiPortMem = () => MultiPortMem(MemParameters(256, 16, syncRead = false, bypass = false), 4)
+//  "MultiPortMemoryTester" should "work properly" in {
+//    Driver.execute(TesterArgs() :+ "MultiPortMemoryTest", dutGenMultiPort) {
+//      c => new MultiPortMemoryTester(c)
+//    } should be(true)
+//  }
 }
