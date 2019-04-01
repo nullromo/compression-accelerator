@@ -50,6 +50,16 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator)(implicit p: Pa
   hashTable.io.writeData := 0.U
   hashTable.io.readAddress := 0.U
 
+  // temporary "main memory" mem for testing
+  val mainMemory = Module(DualReadMultiPortMem(MemParameters(4096, 8, syncRead = false, bypass = false), 8))
+  mainMemory.io.readAddress1 := 0.U
+  mainMemory.io.readAddress2 := 0.U
+  mainMemory.io.writeAddress := 0.U
+  for(i <- 0 until 8) {
+    mainMemory.io.writeEnable(i) := false.B
+    mainMemory.io.writeData(i) := 0.U
+  }
+
   // components for state machine
   val shift: UInt = (32 - log2Floor(tableSize)).U
   val ip_end    = RegInit( 0.U(32.W))
@@ -69,6 +79,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator)(implicit p: Pa
   val ip        = RegInit( 0.U(32.W))
   val matched   = RegInit( 0.U(32.W))
   val s2        = RegInit( 0.U(32.W))
+  val toCopy    = RegInit( 0.U(32.W))
   dontTouch(ip_end)
   dontTouch(base_ip)
   dontTouch(next_emit)
@@ -85,6 +96,16 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator)(implicit p: Pa
   dontTouch(ip)
   dontTouch(matched)
   dontTouch(s2)
+  dontTouch(toCopy)
+
+  val test1: UInt = Wire(UInt(64.W))
+  val test2: UInt = Wire(UInt(64.W))
+  dontTouch(test1)
+  dontTouch(test2)
+  test1 := mainMemory.io.readData1.asUInt()(31,0)
+  test2 := mainMemory.io.readData2.asUInt()(31,0)
+
+  val tempReadAddress = RegInit(0.U(32.W))
 
   // state machine
   when(state === sLookForMatch) {
@@ -106,19 +127,22 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator)(implicit p: Pa
       printf("Compare:  mem[%d]  mem[%d]\n", candidate, next_ip)
 
       //TODO: figure out how to access the memory
-//    when(io.mem(next_ip[4byte]) === io.mem(candidate[4byte])) {
-      // pretend mem(7) === mem(0) TODO: [remove me]
-      when(next_ip === 7.U) {
+      mainMemory.io.readAddress1 := next_ip
+      mainMemory.io.readAddress2 := candidate
+      when(mainMemory.io.readData1.asUInt()(31,0) === mainMemory.io.readData2.asUInt()(31,0)) {
         state := sEmitLiteral
         count := 0.U
         base := op
+        toCopy := next_ip - next_emit
         when(next_ip - next_emit > 60.U) {
           // length > 60 means we need to emit the the length partly as additional bytes after the tag, so we do that in the next state
           n := next_ip - next_emit - 1.U
         }.otherwise {
           // length <= 60 means we can encode the length in the tag byte, so do it now and set n to 0
           //TODO: figure out how to access the memory
-          //        io.mem(op) = (n<<2).asUInt()
+          mainMemory.io.writeAddress := op
+          mainMemory.io.writeData(0) := ((next_ip - next_emit - 1.U)<<2).asUInt()
+          mainMemory.io.writeEnable(0) := true.B
           n := 0.U
         }
         op := op + 1.U
@@ -128,28 +152,39 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator)(implicit p: Pa
     when(n > 0.U) {
       // n > 0 means we are emitting the tag byte(s) and n > 60
       //TODO: figure out how to access the memory
-      //    io.mem(op) = n & 0xFF.U
+      mainMemory.io.writeAddress := base
+      mainMemory.io.writeData(op - base) := n & 0xFF.U
+      mainMemory.io.writeEnable(op - base) := true.B
       op := op + 1.U
       n := (n >> 8.U).asUInt()
       count := count + 1.U
       when((n >> 8.U).asUInt() <= 0.U) {
         // we have reached the end of the tag bytes
         //TODO: figure out how to access the memory
-        //      io.mem(base) = ((count + 59.U) << 2.U).asUInt()
+        mainMemory.io.writeData(0) := ((count + 59.U) << 2.U).asUInt()
+        mainMemory.io.writeEnable(0) := true.B
       }
     }.otherwise {
       // n <= 0 means we are just copying data
-      //TODO: copy (next_emit - next_ip) bytes from next_emit to op and
-      // set op = op + (next_emit - next_ip)
-      //when(done copying) {
-      //  state := sEmitCopy
-      //  matched := 0.U
-      //  s2 := ip + 4.U
-      //  base := ip
-      //}
+      toCopy := Mux(toCopy <= 8.U, 0.U, toCopy - 8.U)
+      op := op + Mux(toCopy <= 8.U, toCopy, 8.U)
+      next_emit := next_emit + Mux(toCopy <= 8.U, toCopy, 8.U)
+      mainMemory.io.writeAddress := op
+      mainMemory.io.readAddress1 := next_emit
+      for(i <- 0 until 8) {
+        mainMemory.io.writeData(i) := mainMemory.io.readData1(i)
+        mainMemory.io.writeEnable(i) := Mux(i.U < toCopy, true.B, false.B)
+      }
+      when(toCopy === 0.U) {
+        state := sEmitCopy
+        matched := 0.U
+        s2 := ip + 4.U
+        base := ip
+      }
     }
   }.elsewhen(state === sEmitCopy) {
-
+    mainMemory.io.readAddress2 := tempReadAddress
+    tempReadAddress := tempReadAddress + 1.U
   }.elsewhen(state === sEmitRemainder) {
 
   }.otherwise /*(state === sIdle)*/ {
@@ -158,6 +193,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator)(implicit p: Pa
         length := cmd.bits.rs1
       }.elsewhen(doCompress) {
         busy := true.B
+        op := cmd.bits.rs2
         src := cmd.bits.rs1
         dst := cmd.bits.rs2
         ip_end := cmd.bits.rs1 + length

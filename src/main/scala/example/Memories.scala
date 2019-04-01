@@ -1,6 +1,7 @@
 package example
 
 import chisel3._
+import chisel3.util.experimental.loadMemoryFromFile
 import chisel3.util.{Cat, log2Ceil}
 
 /**
@@ -17,6 +18,8 @@ case class MemParameters(numEntries: Int,
                          bypass: Boolean) {
   val addressWidth: Int = log2Ceil(numEntries)
 }
+
+//TODO: Some of these could be special cases of the others, but I don't think we care that much right now.
 
 /**
   * Memory with multiple read and write ports.
@@ -39,6 +42,36 @@ case class MultiPortMem(p: MemParameters, numPorts: Int) extends Module {
     mem.write(io.writeAddress + i.U, wrData, wrEnable)
 
     io.readData(i) := mem.read(io.readAddress + i.U)(0)
+  }
+}
+
+/**
+  * Just like a MultiPortMem, but with 2 separate read locations.
+  * TODO: it's so messy with copy and paste :(
+  */
+case class DualReadMultiPortMem(p: MemParameters, numPorts: Int) extends Module {
+  val io = IO(new Bundle {
+    val readAddress1 = Input(UInt(p.addressWidth.W))
+    val readAddress2 = Input(UInt(p.addressWidth.W))
+    val readData1 = Output(Vec(numPorts, UInt(p.bitsPerEntry.W)))
+    val readData2 = Output(Vec(numPorts, UInt(p.bitsPerEntry.W)))
+    val writeAddress = Input(UInt(p.addressWidth.W))
+    val writeData = Input(Vec(numPorts, UInt(p.bitsPerEntry.W)))
+    val writeEnable = Input(Vec(numPorts, Bool()))
+  })
+
+  val mem = Mem(p.numEntries, Vec(1, UInt(p.bitsPerEntry.W)))
+  loadMemoryFromFile(mem, "memdata/memdata.txt")
+
+  for(i <- 0 until numPorts) {
+    val wrEnable: Vec[Bool] = Wire(Vec(1, Bool()))
+    val wrData: Vec[UInt] = Wire(Vec(1, UInt(p.bitsPerEntry.W)))
+    wrEnable(0) := io.writeEnable(i)
+    wrData(0) := io.writeData(i)
+    mem.write(io.writeAddress + i.U, wrData, wrEnable)
+
+    io.readData1(i) := mem.read(io.readAddress1 + i.U)(0)
+    io.readData2(i) := mem.read(io.readAddress2 + i.U)(0)
   }
 }
 
