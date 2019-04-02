@@ -1,4 +1,4 @@
-package example
+//package example
 
 import chisel3.{Bool, Bundle, Input, Module, Output}
 import chisel3.iotesters._
