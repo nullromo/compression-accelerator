@@ -215,7 +215,7 @@ class CopyStreamFormer (params: CopyCompressParams) extends Module{
         }
         .otherwise{
             io.copyCompressed_four.valid := true.B
-            io.copyCompressed_four.bits := ((copyOffset & (0xFF000000).U) >> 24) + ((copyOffset & (0x00FF0000).U) >> 8) + ((copyOffset & (0x0000FF00).U) << 8) + ((copyOffset & (0x000000FF).U) << 24) + (3.U << 32) + length << 34
+            io.copyCompressed_four.bits := ((copyOffset & (0xFF000000L).U) >> 24) + ((copyOffset & (0x00FF0000L).U) >> 8) + ((copyOffset & (0x0000FF00L).U) << 8) + ((copyOffset & (0x000000FFL).U) << 24) + (3.U << 32) + length << 34
         }
 
         when(io.copyCompressed_one.ready){
