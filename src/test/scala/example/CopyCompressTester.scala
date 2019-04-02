@@ -37,7 +37,7 @@ class CopyCompressTester(c: CopyCompress, params: CopyCompressParams, candidateV
         }
 
         waitCounter = 0
-        while(!(peek(c.io.copyCompressed_one.valid) == BigInt(0) || peek(c.io.copyCompressed_two.valid) == BigInt(0) || peek(c.io.copyCompressed_four.valid) == BigInt(0)) && waitCounter < maxWaitCycle){
+        while(!(peek(c.io.copyCompressed_one.valid) == BigInt(1) || peek(c.io.copyCompressed_two.valid) == BigInt(1) || peek(c.io.copyCompressed_four.valid) == BigInt(1)) && waitCounter < maxWaitCycle){
             waitCounter += 1
             if (waitCounter >= maxWaitCycle){
                 expect(false, "waited for output too long")
