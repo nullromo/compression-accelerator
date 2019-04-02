@@ -145,12 +145,12 @@ class CopyCompress (val params: CopyCompressParams) extends Module{
     copyStreamFormer.io.start.bits := start_reg & (~io.equal)
     copyStreamFormer.io.start.valid := true.B
 
-    copyStreamFormer.io.copyCompressed_one.bits := io.copyCompressed_one.bits
-    copyStreamFormer.io.copyCompressed_two.bits := io.copyCompressed_two.bits
-    copyStreamFormer.io.copyCompressed_four.bits := io.copyCompressed_four.bits
-    copyStreamFormer.io.copyCompressed_one.valid := io.copyCompressed_one.valid
-    copyStreamFormer.io.copyCompressed_two.valid := io.copyCompressed_two.valid
-    copyStreamFormer.io.copyCompressed_four.valid := io.copyCompressed_four.valid
+    io.copyCompressed_one.bits := copyStreamFormer.io.copyCompressed_one.bits
+    io.copyCompressed_two.bits := copyStreamFormer.io.copyCompressed_two.bits
+    io.copyCompressed_four.bits := copyStreamFormer.io.copyCompressed_four.bits
+    io.copyCompressed_one.valid := copyStreamFormer.io.copyCompressed_one.valid
+    io.copyCompressed_two.valid := copyStreamFormer.io.copyCompressed_two.valid
+    io.copyCompressed_four.valid := copyStreamFormer.io.copyCompressed_four.valid
 
     io.copyCompressed_one.ready := copyStreamFormer.io.copyCompressed_one.ready
     io.copyCompressed_two.ready := copyStreamFormer.io.copyCompressed_two.ready
