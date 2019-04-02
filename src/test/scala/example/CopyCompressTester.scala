@@ -23,7 +23,7 @@ class CopyCompressTester(c: CopyCompress, params: CopyCompressParams, candidateV
         poke(c.io.copyCompressed_two.ready, 1)
         poke(c.io.copyCompressed_four.ready, 1)
 
-        while( (currentParse == 0) || (peek(c.io.equal) == BigInt(0) && (currentParse+inc <= candidateVec(0).length))){
+        while( (currentParse == 0) || (peek(c.io.equal) == BigInt(1) && (currentParse+inc <= candidateVec(0).length))){
             c.io.candidate.zipWithIndex.foreach{case(in, idx) => poke(in.bits, candidateVec(i)(currentParse+idx))
                                                                  poke(in.valid, 1)}
             c.io.data.zipWithIndex.foreach{case(in, idx) => poke(in.bits, dataVec(i)(currentParse+idx))
@@ -36,23 +36,25 @@ class CopyCompressTester(c: CopyCompress, params: CopyCompressParams, candidateV
             step(1)
         }
 
+          print(peek(c.io.copyCompressed_one.valid))
+          print(peek(c.io.copyCompressed_two.valid))
+          print(peek(c.io.copyCompressed_four.valid))
         waitCounter = 0
         while(!(peek(c.io.copyCompressed_one.valid) == BigInt(1) || peek(c.io.copyCompressed_two.valid) == BigInt(1) || peek(c.io.copyCompressed_four.valid) == BigInt(1)) && waitCounter <= maxWaitCycle){
             waitCounter += 1
             if (waitCounter >= maxWaitCycle){
                 expect(false, "waited for output too long")
             }
-            println(waitCounter)
             step(1)
         }
         
-        if(peek(c.io.copyCompressed_one.valid) == BigInt(0)){
+        if(peek(c.io.copyCompressed_one.valid) == BigInt(1)){
             expect(c.io.copyCompressed_one.bits, goldenRes(i))
         }
-        else if(peek(c.io.copyCompressed_two.valid) == BigInt(0)){
+        else if(peek(c.io.copyCompressed_two.valid) == BigInt(1)){
             expect(c.io.copyCompressed_two.bits, goldenRes(i))
         }
-        else if(peek(c.io.copyCompressed_four.valid) == BigInt(0)){
+        else if(peek(c.io.copyCompressed_four.valid) == BigInt(1)){
             expect(c.io.copyCompressed_four.bits, goldenRes(i))
         }
 
