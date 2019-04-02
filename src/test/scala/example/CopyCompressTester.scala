@@ -16,9 +16,9 @@ class CopyCompressTester(c: CopyCompress, params: CopyCompressParams, candidateV
         currentParse = 0
 
         poke(c.io.hit, true)
+        poke(c.io.remain, 100)
         step(1)
         poke(c.io.hit, false)
-        poke(c.io.remain, 100)
         poke(c.io.copyCompressed_one.ready, 1)
         poke(c.io.copyCompressed_two.ready, 1)
         poke(c.io.copyCompressed_four.ready, 1)

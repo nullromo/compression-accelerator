@@ -96,7 +96,7 @@ class CopyCompress (val params: CopyCompressParams) extends Module{
     
     when(start_reg & copyStreamFormer.io.start.ready){
 
-        io.bufferPtrInc.bits := 0.U // default value
+        io.bufferPtrInc.bits := 1.U // default value
         io.bufferPtrInc.valid := false.B
 
         // calculating how many same bytes between input data and candidate buffer
@@ -134,7 +134,7 @@ class CopyCompress (val params: CopyCompressParams) extends Module{
     }
     .elsewhen(start_reg){
         io.equal := true.B
-        io.bufferPtrInc.bits := 0.U // default value
+        io.bufferPtrInc.bits := 1.U // default value
         io.bufferPtrInc.valid := true.B
     }
     .otherwise{
