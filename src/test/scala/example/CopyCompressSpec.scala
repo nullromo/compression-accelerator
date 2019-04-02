@@ -16,7 +16,7 @@ class CopyCompressSpec extends FlatSpec with Matchers{
     val testNum = 3
     val vecLength = 70
     val candidateVec = Array.ofDim[List[Int]](testNum)
-    val dataVec = Array.ofDim[Int](testNum)
+    val dataVec = Array.ofDim[List[Int]](testNum)
     val rangen = new Random(15)
     val maxOneByte = pow(2,8).toInt
     val maxTwoByte = pow(2,16).toInt

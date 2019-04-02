@@ -23,7 +23,7 @@ class CopyCompressTester(c: CopyCompress, params: CopyCompressParams, candidateV
         poke(c.io.copyCompressed_two.ready, 1)
         poke(c.io.copyCompressed_four.ready, 1)
 
-        while( (currentParse == 0) || (peek(c.io.equal) && (currentParse+inc <= candidateVec(0).length))){
+        while( (currentParse == 0) || (peek(c.io.equal) == BigInt(0) && (currentParse+inc <= candidateVec(0).length))){
             c.io.candidate.bits.zipWithIndex.foreach{case(in, idx) => poke(in, candidateVec(i)(currentParse+idx))}
             c.io.data.bits.zipWithIndex.foreach{case(in, idx) => poke(in, dataVec(i)(currentParse+idx))}
             poke(c.io.offset.bits, offsetVec(i))
@@ -38,7 +38,7 @@ class CopyCompressTester(c: CopyCompress, params: CopyCompressParams, candidateV
         }
 
         waitCounter = 0
-        while(~(peek(c.io.copyCompressed_one.valid) || peek(c.io.copyCompressed_two.valid) || peek(c.io.copyCompressed_four.valid)) && waitCounter < maxWaitCycle){
+        while(~(peek(c.io.copyCompressed_one.valid) == BigInt(0) || peek(c.io.copyCompressed_two.valid) == BigInt(0) || peek(c.io.copyCompressed_four.valid) == BigInt(0)) && waitCounter < maxWaitCycle){
             waitCounter += 1
             if (waitCounter >= maxWaitCycle){
                 expect(false, "waited for output too long")
