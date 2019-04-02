@@ -53,6 +53,9 @@ class CopyCompress (val params: CopyCompressParams) extends Module{
     val reachEnd = Wire(Bool())
 
     val maxLength:Int = pow(2,6).toInt
+    print(maxLength)
+    print("\n")
+    print(pow(2,1)-1)
 
     val copyStreamFormer = Module(new CopyStreamFormer(params))
 
