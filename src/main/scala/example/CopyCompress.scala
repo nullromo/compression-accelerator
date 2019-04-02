@@ -48,6 +48,8 @@ class CopyCompress (val params: CopyCompressParams) extends Module{
 
     val maxLength:Int = pow(2,6).toInt
 
+    val copyStreamFormer = Module(new CopyStreamFormer(params))
+
 
     when(io.hit){
         start_reg := true.B
@@ -133,7 +135,6 @@ class CopyCompress (val params: CopyCompressParams) extends Module{
     io.data.foreach{(a) => a.ready := true.B}
     io.candidate.foreach{(a) => a.ready := true.B}
 
-    val copyStreamFormer = Module(new CopyStreamFormer(params))
 
     copyStreamFormer.io.offset.bits := io.offset.bits
     copyStreamFormer.io.offset.valid := io.offset.valid
