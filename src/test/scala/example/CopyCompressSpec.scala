@@ -34,8 +34,8 @@ class CopyCompressSpec extends FlatSpec with Matchers{
     val dummyCandidateTest1 = Array.fill[Int](vecLength-copyByteTest1)(1)
     val dummyDataTest1 = Array.fill[Int](vecLength-copyByteTest1)(2)
 
-    candidateVec(0) = sameDataTest1 ++ dummyCandidateTest1
-    dataVec(0) = sameDataTest1 ++ dummyDataTest1
+    candidateVec(0) = sameDataTest1.toList ++ dummyCandidateTest1.toList
+    dataVec(0) = sameDataTest1.toList ++ dummyDataTest1.toList
 
 
     // test case 2:
@@ -50,11 +50,11 @@ class CopyCompressSpec extends FlatSpec with Matchers{
     val dummyCandidateTest2 = Array.fill[Int](vecLength-copyByteTest2)(1)
     val dummyDataTest2 = Array.fill[Int](vecLength-copyByteTest2)(2)
 
-    candidateVec(1) = sameDataTest2 ++ dummyCandidateTest2
-    candidateVec(2) = sameDataTest2 ++ dummyCandidateTest2
+    candidateVec(1) = sameDataTest2.toList ++ dummyCandidateTest2.toList
+    candidateVec(2) = sameDataTest2.toList ++ dummyCandidateTest2.toList
 
-    dataVec(1) = sameDataTest2 ++ dummyDataTest1 
-    dataVec(2) = sameDataTest2 ++ dummyDataTest2
+    dataVec(1) = sameDataTest2.toList ++ dummyDataTest1.toList 
+    dataVec(2) = sameDataTest2.toList ++ dummyDataTest2.toList
     
     // generate 1/2/4 bytes offset between data and candidate
     val offsetVec = List(rangen.nextInt(maxOneByteOffset), rangen.nextInt(maxTwoByte), rangen.nextInt)
