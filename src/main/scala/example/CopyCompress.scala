@@ -3,6 +3,7 @@ package example
 import chisel3._
 import chisel3.util._
 import scala.math._
+import chisel3.experimental.dontTouch
 
 trait CopyCompressParams{
     val parallellane: Int
@@ -43,6 +44,11 @@ class CopyCompress (val params: CopyCompressParams) extends Module{
     val num_data_valid = Wire(UInt((log2Ceil(params.parallellane)+1).W))
 
     val compareResult = Wire(Vec(params.parallellane, Bool()))
+    val compareResult_uint = Wire(UInt((params.parallellane).W))
+    dontTouch(compareResult)
+    dontTouch(compareResult_uint)
+    dontTouch(num_candidate_valid)
+    dontTouch(num_data_valid)
 
     val reachEnd = Wire(Bool())
 
@@ -50,12 +56,14 @@ class CopyCompress (val params: CopyCompressParams) extends Module{
 
     val copyStreamFormer = Module(new CopyStreamFormer(params))
 
+    compareResult_uint := compareResult.asUInt
+
 
     when(io.hit){
         start_reg := true.B
         lengthAccum := 0.U
     }
-    when(~io.equal){ 
+    .elsewhen(~io.equal){ 
       start_reg := false.B
     }
 
@@ -94,7 +102,7 @@ class CopyCompress (val params: CopyCompressParams) extends Module{
         // However, if # data is 0 and remain is 0, the compression is reach the end
         when(num_candidate_valid >= num_data_valid && ~reachEnd){
             for(i <- 0 until params.parallellane){
-                when(compareResult.asUInt >= (pow(2,i+1).toInt - 1).U ){
+                when(compareResult_uint >= (pow(2,i+1).toInt - 1).U ){
                     when(lengthAccum < maxLength.U  && ((lengthAccum + i.U) <= maxLength.U)){ // 6-bits represents 1-64 same bytes not 0-63
                         io.bufferPtrInc.bits := (i+1).U
                     }
