@@ -24,12 +24,11 @@ class CopyCompressTester(c: CopyCompress, params: CopyCompressParams, candidateV
         poke(c.io.copyCompressed_four.ready, 1)
 
         while( (currentParse == 0) || (peek(c.io.equal) == BigInt(0) && (currentParse+inc <= candidateVec(0).length))){
-            c.io.candidate.bits.zipWithIndex.foreach{case(in, idx) => poke(in, candidateVec(i)(currentParse+idx))}
-            c.io.data.bits.zipWithIndex.foreach{case(in, idx) => poke(in, dataVec(i)(currentParse+idx))}
+            c.io.candidate.zipWithIndex.foreach{case(in, idx) => poke(in.bits, candidateVec(i)(currentParse+idx))
+                                                                 poke(in.valid, 1)}
+            c.io.data.zipWithIndex.foreach{case(in, idx) => poke(in.bits, dataVec(i)(currentParse+idx))
+                                                            poke(in.valid, 1)}
             poke(c.io.offset.bits, offsetVec(i))
-
-            poke(c.io.candidate.valid, 1)
-            poke(c.io.data.valid, 1)
             poke(c.io.offset.valid, 1)
 
             currentParse += inc
@@ -46,13 +45,13 @@ class CopyCompressTester(c: CopyCompress, params: CopyCompressParams, candidateV
             step(1)
         }
         
-        if(peek(c.io.copyCompressed_one.valid)){
+        if(peek(c.io.copyCompressed_one.valid) == BigInt(0)){
             expect(c.io.copyCompressed_one.bits, goldenRes(i))
         }
-        else if(peek(c.io.copyCompressed_two.valid)){
+        else if(peek(c.io.copyCompressed_two.valid) == BigInt(0)){
             expect(c.io.copyCompressed_two.bits, goldenRes(i))
         }
-        else if(peek(c.io.copyCompressed_four.valid)){
+        else if(peek(c.io.copyCompressed_four.valid) == BigInt(0)){
             expect(c.io.copyCompressed_four.bits, goldenRes(i))
         }
 
