@@ -152,9 +152,9 @@ class CopyCompress (val params: CopyCompressParams) extends Module{
     io.copyCompressed_two.valid := copyStreamFormer.io.copyCompressed_two.valid
     io.copyCompressed_four.valid := copyStreamFormer.io.copyCompressed_four.valid
 
-    io.copyCompressed_one.ready := copyStreamFormer.io.copyCompressed_one.ready
-    io.copyCompressed_two.ready := copyStreamFormer.io.copyCompressed_two.ready
-    io.copyCompressed_four.ready := copyStreamFormer.io.copyCompressed_four.ready
+    copyStreamFormer.io.copyCompressed_one.ready := io.copyCompressed_one.ready
+    copyStreamFormer.io.copyCompressed_two.ready := io.copyCompressed_two.ready
+    copyStreamFormer.io.copyCompressed_four.ready := io.copyCompressed_four.ready
 
 }
 
