@@ -57,7 +57,7 @@ class CopyCompressSpec extends FlatSpec with Matchers{
     dataVec(2) = sameDataTest2 ++ dummyDataTest2
     
     // generate 1/2/4 bytes offset between data and candidate
-    val offsetVec = List(rangen.nextInt(maxOneByteOffset) rangen.nextInt(maxTwoByte), rangen.nextInt)
+    val offsetVec = List(rangen.nextInt(maxOneByteOffset), rangen.nextInt(maxTwoByte), rangen.nextInt)
 
     // get golden result
     // Test1 result
