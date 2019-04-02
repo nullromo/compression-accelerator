@@ -61,9 +61,9 @@ class CopyCompressSpec extends FlatSpec with Matchers{
 
     // get golden result
     // Test1 result
-    val testResult1 = offsetVec(0) & 0x0FF + offsetVec(0) & 0x700 << 5 + (copyByteTest1 - 4) << 10 + 1 << 8
-    val testResult2 = offsetVec(1) & 0xFF00 >> 8 + offsetVec(1) & 0x00FF << 8 + copyByteTest2 << 18 + 2 << 16
-    val testResult3 = offsetVec(2) & 0xFF000000 >> 24 + offsetVec(2) & 0x00FF0000 >> 8 + offsetVec(2) & 0x0000FF00 << 8 + offsetVec(2) & 0x000000FF << 24 + 3 << 32 + copyByteTest2 << 34
+    val testResult1: BigInt = offsetVec(0) & 0x0FF + offsetVec(0) & 0x700 << 5 + (copyByteTest1 - 4) << 10 + 1 << 8
+    val testResult2: BigInt = offsetVec(1) & 0xFF00 >> 8 + offsetVec(1) & 0x00FF << 8 + copyByteTest2 << 18 + 2 << 16
+    val testResult3: BigInt = offsetVec(2) & 0xFF000000 >> 24 + offsetVec(2) & 0x00FF0000 >> 8 + offsetVec(2) & 0x0000FF00 << 8 + offsetVec(2) & 0x000000FF << 24 + 3 << 32 + copyByteTest2 << 34
 
     val goldenRes = List(testResult1, testResult2, testResult3)
 
