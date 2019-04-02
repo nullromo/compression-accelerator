@@ -45,9 +45,11 @@ class TreadleTest extends FlatSpec with Matchers {
     val s = chisel3.Driver.emit(() => LazyModule(new CompressionAccelerator(OpcodeSet.custom3)).module)
     implicit val tester: TreadleTester = new TreadleTester(s)
 
+    // set up memory
     val mem = "mainMemory.mem_0"
     loadMemFromFile("memdata/memdata_0.txt", mem)
 
+    // start compression
     tester.poke("io_cmd_bits_inst_funct", 2)
     tester.poke("io_cmd_bits_rs1", 100)
     tester.poke("io_cmd_valid", 1)
@@ -58,6 +60,7 @@ class TreadleTest extends FlatSpec with Matchers {
     tester.step()
     tester.poke("io_cmd_valid", 0)
 
+    //do testing
     var dump: Seq[BigInt] = Seq()
 
     for(i <- 0 until 500) {
@@ -71,6 +74,7 @@ class TreadleTest extends FlatSpec with Matchers {
     }
   }
 
+  // returns the first 128 bytes of a memory
   def read128Mem(mem: String)(implicit tester: TreadleTester): Seq[BigInt] = {
     var arr: Seq[BigInt] = Seq()
     for(i <- 0 until 128) {
@@ -79,14 +83,16 @@ class TreadleTest extends FlatSpec with Matchers {
     arr
   }
 
+  // prints the first 128 bytes of a memory
   def dump128Mem(mem: String)(implicit tester: TreadleTester): Unit = {
     for(i <- 0 until 128) {
       print(if(i%8==0) "\n" else " ")
       print(tester.peekMemory(mem, i))
     }
-    println()
+    println("")
   }
 
+  // loads data into a memory from a file
   def loadMemFromFile(filename: String, mem: String)(implicit tester: TreadleTester): Unit = {
     for((element, index) <- Source.fromFile(filename).getLines().zipWithIndex) {
       tester.pokeMemory(mem, index, element.toInt)

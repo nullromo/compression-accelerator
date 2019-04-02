@@ -104,6 +104,55 @@ class MultiPortMemoryTester(c: MultiPortMem) extends PeekPokeTester(c) {
   step(3)
 }
 
+class DualReadMultiPortMemTester(c: DualReadMultiPortMem) extends PeekPokeTester(c) {
+  poke(c.io.writeAddress, 100)
+  poke(c.io.writeData(0), 64)
+  poke(c.io.writeEnable(0), true)
+  for(i<-1 until 8)
+    poke(c.io.writeEnable(i), false)
+  step(1)
+
+  poke(c.io.writeAddress, 101)
+  poke(c.io.writeData(0), 9)
+  poke(c.io.writeData(1), 5)
+  poke(c.io.writeData(2), 6)
+  poke(c.io.writeData(3), 4)
+  poke(c.io.writeData(4), 3)
+  poke(c.io.writeData(5), 2)
+  poke(c.io.writeData(6), 6)
+  poke(c.io.writeData(7), 5)
+  for(i <-0 until 8)
+    poke(c.io.writeEnable(i), true)
+  step(1)
+
+  poke(c.io.writeAddress, 109)
+  poke(c.io.writeData(0), 4)
+  poke(c.io.writeData(1), 3)
+  poke(c.io.writeData(2), 2)
+  poke(c.io.writeData(3), 9)
+  poke(c.io.writeData(4), 1)
+  poke(c.io.writeData(5), 8)
+  poke(c.io.writeData(6), 7)
+  poke(c.io.writeData(7), 9)
+  for(i <-0 until 8)
+    poke(c.io.writeEnable(i), true)
+  step(1)
+
+  poke(c.io.writeAddress, 117)
+  poke(c.io.writeData(0), 12)
+  poke(c.io.writeEnable(0), true)
+  for(i<-1 until 8)
+    poke(c.io.writeEnable(i), false)
+  step(1)
+
+  for(i <- 0 until 128) {
+    print(if(i%8==0) "\n" else " ")
+    poke(c.io.readAddress1, i)
+    print(peek(c.io.readData1(0)))
+  }
+  println("")
+}
+
 /**
   * Spec for memory tester.
   */
@@ -119,6 +168,13 @@ class MemoryTesterSpec extends ChiselFlatSpec {
   "MultiPortMemoryTester" should "work properly" in {
     Driver.execute(TesterArgs() :+ "MultiPortMemoryTest", dutGenMultiPort) {
       c => new MultiPortMemoryTester(c)
+    } should be(true)
+  }
+
+  val dutGenDualReadMultiPort: () => DualReadMultiPortMem = () => DualReadMultiPortMem(MemParameters(256, 8, syncRead = false, bypass = false), 8)
+  "DualReadMultiPortMemoryTester" should "work properly" in {
+    Driver.execute(TesterArgs() :+ "DualReadMultiPortMemoryTest", dutGenDualReadMultiPort) {
+      c => new DualReadMultiPortMemTester(c)
     } should be(true)
   }
 }
