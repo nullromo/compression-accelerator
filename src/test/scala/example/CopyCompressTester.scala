@@ -42,6 +42,7 @@ class CopyCompressTester(c: CopyCompress, params: CopyCompressParams, candidateV
             if (waitCounter >= maxWaitCycle){
                 expect(false, "waited for output too long")
             }
+            println(waitCounter)
             step(1)
         }
         
