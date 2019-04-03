@@ -54,9 +54,6 @@ class CopyCompress (val params: CopyCompressParams) extends Module{
     val reachEnd = Wire(Bool())
 
     val maxLength:Int = pow(2,6).toInt
-    print(maxLength)
-    print("\n")
-    print((pow(2,1)-1).toInt)
 
     val copyStreamFormer = Module(new CopyStreamFormer(params))
 
@@ -107,7 +104,7 @@ class CopyCompress (val params: CopyCompressParams) extends Module{
         // It has problem here !!!!!!
         when(num_candidate_valid >= num_data_valid && ~reachEnd){
             for(i <- 0 until params.parallellane){
-                when(compareResult_uint >= ((pow(2,i+1) - 1).toInt).U ){
+                when(compareResult.slice(0,i+1).asUInt == ((pow(2,i+1) - 1).toInt).U ){
                     when(lengthAccum < maxLength.U  && ((lengthAccum + i.U) <= maxLength.U)){ // 6-bits represents 1-64 same bytes not 0-63
                         io.bufferPtrInc.bits := (i+1).U
                     }
