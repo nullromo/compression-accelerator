@@ -57,16 +57,32 @@ class CopyCompressSpec extends FlatSpec with Matchers{
     dataVec(2) = sameDataTest2.toList ++ dummyDataTest2.toList
     
     // generate 1/2/4 bytes offset between data and candidate
-    val offsetVec = List(rangen.nextInt(maxOneByteOffset), rangen.nextInt(maxTwoByte), rangen.nextInt)
-    offsetVec.foreach(println)
+    val offsetVec = List(BigInt(rangen.nextInt(maxOneByteOffset)), BigInt(rangen.nextInt(maxTwoByte)), BigInt(rangen.nextInt)/*0x4db39d07*/)
+
+    println("copyBytes for each tests are:")
+    print(copyByteTest1)
+    print("\n")
+    print(copyByteTest2)
+    print("\n")
+    print(copyByteTest2)
+    print("\n")
+
+
+
+
+
+    println("offset for each test is:")
+    offsetVec.foreach((a) => println(a.toString(16)))
 
     // get golden result
     // Test1 result
-    val testResult1: BigInt = offsetVec(0) & 0x0FF + offsetVec(0) & 0x700 << 5 + (copyByteTest1 - 4) << 10 + 1 << 8
-    val testResult2: BigInt = offsetVec(1) & 0xFF00 >> 8 + offsetVec(1) & 0x00FF << 8 + copyByteTest2 << 18 + 2 << 16
-    val testResult3: BigInt = offsetVec(2) & 0xFF000000 >> 24 + offsetVec(2) & 0x00FF0000 >> 8 + offsetVec(2) & 0x0000FF00 << 8 + offsetVec(2) & 0x000000FF << 24 + 3 << 32 + copyByteTest2 << 34
+    val testResult1: BigInt = (offsetVec(0) & 0x0FF) | ((offsetVec(0) & 0x700) << 5) |(BigInt(copyByteTest1 - 4) << 10) | (BigInt(1) << 8)
+    val testResult2: BigInt = ((offsetVec(1) & 0xFF00) >> 8) | ((offsetVec(1) & 0x00FF) << 8) | (BigInt(copyByteTest2-1) << 18) | (BigInt(2) << 16)
+    val testResult3: BigInt = ((offsetVec(2) & 0xFF000000) >> 24) | ((offsetVec(2) & 0x00FF0000) >> 8) | ((offsetVec(2) & 0x0000FF00) << 8) | ((offsetVec(2) & 0x000000FF) << 24) | (BigInt(3) << 32) | (BigInt(copyByteTest2-1) << 34) & (0x00000FFFFFFFFFFL)
 
     val goldenRes = List(testResult1, testResult2, testResult3)
+    println("goldenRes are:")
+    goldenRes.foreach((a) => println(a.toString(16)))
 
     it should "Test copy compression case 2" in{
         DoCopyCompressTester(params, candidateVec, dataVec, offsetVec, goldenRes) should be (true)

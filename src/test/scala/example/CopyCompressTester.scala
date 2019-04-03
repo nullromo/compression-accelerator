@@ -4,7 +4,7 @@ import chisel3.iotesters._
 import chisel3._
 import chisel3.util._
 
-class CopyCompressTester(c: CopyCompress, params: CopyCompressParams, candidateVec: Seq[Seq[Int]], dataVec: Seq[Seq[Int]], offsetVec: Seq[Int], goldenRes: Seq[BigInt]) extends PeekPokeTester(c){
+class CopyCompressTester(c: CopyCompress, params: CopyCompressParams, candidateVec: Seq[Seq[Int]], dataVec: Seq[Seq[Int]], offsetVec: Seq[BigInt], goldenRes: Seq[BigInt]) extends PeekPokeTester(c){
 
     val maxWaitCycle = 50
     val numberTest = candidateVec.length
@@ -36,9 +36,6 @@ class CopyCompressTester(c: CopyCompress, params: CopyCompressParams, candidateV
             step(1)
         }
 
-          print(peek(c.io.copyCompressed_one.valid))
-          print(peek(c.io.copyCompressed_two.valid))
-          print(peek(c.io.copyCompressed_four.valid))
         waitCounter = 0
         while(!(peek(c.io.copyCompressed_one.valid) == BigInt(1) || peek(c.io.copyCompressed_two.valid) == BigInt(1) || peek(c.io.copyCompressed_four.valid) == BigInt(1)) && waitCounter <= maxWaitCycle){
             waitCounter += 1
@@ -49,22 +46,38 @@ class CopyCompressTester(c: CopyCompress, params: CopyCompressParams, candidateV
         }
         
         if(peek(c.io.copyCompressed_one.valid) == BigInt(1)){
+            println("CopyCompressed_one")
+            print(peek(c.io.copyCompressed_one.bits))
+            print("\n")
+            print(goldenRes(i))
+            print("\n")
             expect(c.io.copyCompressed_one.bits, goldenRes(i))
         }
         else if(peek(c.io.copyCompressed_two.valid) == BigInt(1)){
             expect(c.io.copyCompressed_two.bits, goldenRes(i))
+            println("CopyCompressed_two")
+            print(peek(c.io.copyCompressed_two.bits))
+            print("\n")
+            print(goldenRes(i))
+            print("\n")
         }
         else if(peek(c.io.copyCompressed_four.valid) == BigInt(1)){
             expect(c.io.copyCompressed_four.bits, goldenRes(i))
+            println("CopyCompressed_four")
+            print(peek(c.io.copyCompressed_four.bits))
+            print("\n")
+            print(goldenRes(i))
+            print("\n")
         }
 
         step(1)
 
     }
+    step(10)
 }
 
 object DoCopyCompressTester {
-    def apply(params: CopyCompressParams, candidateVec: Seq[Seq[Int]], dataVec: Seq[Seq[Int]], offsetVec: Seq[Int], goldenRes: Seq[BigInt]): Boolean = {
+    def apply(params: CopyCompressParams, candidateVec: Seq[Seq[Int]], dataVec: Seq[Seq[Int]], offsetVec: Seq[BigInt], goldenRes: Seq[BigInt]): Boolean = {
         chisel3.iotesters.Driver.execute(Array("-tbn", "verilator", "-fiwv"), () => new CopyCompress(params)) {
             c => new CopyCompressTester(c, params, candidateVec, dataVec, offsetVec, goldenRes)
         }
