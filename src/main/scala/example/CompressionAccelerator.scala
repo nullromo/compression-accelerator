@@ -3,17 +3,43 @@ package example
 import chisel3._
 import chisel3.core.dontTouch
 import chisel3.util._
+import external.{FrontendTLB, Scratchpad}
 import freechips.rocketchip.config.Parameters
+import freechips.rocketchip.diplomacy.LazyModule
 import freechips.rocketchip.tile._
+import freechips.rocketchip.tilelink.{TLEdgeOut, TLIdentityNode}
 
-class CompressionAccelerator(opcodes: OpcodeSet)(implicit p: Parameters)
-  extends LazyRoCC(opcodes, nPTWPorts = 1) {
-  override lazy val module = new CompressionAcceleratorModule(this)
+case class CompressionParameters(hashTableSize: Int,
+                                 scratchpadBanks: Int,
+                                 scratchpadEntries: Int,
+                                 scratchpadWidth: Int) {
 }
 
-class CompressionAcceleratorModule(outer: CompressionAccelerator)(implicit p: Parameters)
+object DefaultCompressionParameters extends CompressionParameters(
+  hashTableSize = 4096,
+  scratchpadBanks = 1,
+  scratchpadEntries = 4096,
+  scratchpadWidth = 64)
+
+class CompressionAccelerator(opcodes: OpcodeSet, params: CompressionParameters = DefaultCompressionParameters)(implicit p: Parameters)
+  extends LazyRoCC(opcodes, nPTWPorts = 1) {
+  override lazy val module = new CompressionAcceleratorModule(this, params)
+//  val scratchpad = LazyModule(new Scratchpad(params.scratchpadBanks, params.scratchpadEntries, params.scratchpadWidth))
+//  override val tlNode: TLIdentityNode = scratchpad.node
+}
+
+class CompressionAcceleratorModule(outer: CompressionAccelerator, params: CompressionParameters)(implicit p: Parameters)
   extends LazyRoCCModuleImp(outer) with HasCoreParameters {
-  val tableSize = 16
+
+  // get a reference to the scratchpad inside the implementation module
+//  import outer.scratchpad
+
+  // connect the scratchpad to the L2 cache
+//  implicit val edge: TLEdgeOut = outer.tlNode.edges.out.head
+//  val tlb = Module(new FrontendTLB(1, 4))
+//  tlb.io.clients(0) <> scratchpad.module.io.tlb
+//  io.ptw.head <> tlb.io.ptw
+
   //TODO: change all the magic numbers to parameters
 
   // STATE MACHINE
@@ -42,37 +68,20 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator)(implicit p: Pa
 
   // drives the busy signal to tell the CPU that the accelerator is busy
   val busy = RegInit(false.B)
-
-  // tableSize-entry table, data is 16 bits for offset
-  val hashTable = Module(BasicMem(MemParameters(tableSize, 16, syncRead = false, bypass = false)))
-  hashTable.io.writeAddress := next_hash
-  hashTable.io.writeData := ip - base_ip
-  hashTable.io.writeEnable := true.B
-  hashTable.io.readAddress := next_hash
-  candidate := hashTable.io.readData
-
-  // temporary "main memory" mem for testing
-  val mainMemory = Module(DualReadMultiPortMem(MemParameters(4096, 8, syncRead = false, bypass = false), 8))
-  mainMemory.io.readAddress1 := 0.U
-  mainMemory.io.readAddress2 := 0.U
-  mainMemory.io.writeAddress := 0.U
-  for(i <- 0 until 8) {
-    mainMemory.io.writeData(i) := 0.U
-    mainMemory.io.writeEnable(i) := false.B
-  }
+  cmd.ready := !busy
+  io.busy := busy
 
   // components for state machine
-  val shift: UInt = (32 - log2Floor(tableSize)).U
+  val shift: UInt = (32 - log2Floor(params.hashTableSize)).U
   val ip_end    = RegInit( 0.U(32.W))
   val base_ip   = RegInit( 0.U(32.W))
   val next_emit = RegInit( 0.U(32.W))
   val kInputMarginBytes: UInt = 15.U
   val ip_limit  = RegInit( 0.U(32.W))
-  val next_hash = RegInit( 0.U(32.W))
+  val hash      = RegInit( 0.U(32.W))
   val skip      = RegInit(32.U(32.W))
   val ip        = RegInit( 0.U(32.W))
   val candidate = RegInit( 0.U(32.W))
-  val bbhl      = RegInit( 0.U(32.W))
   val op        = RegInit( 0.U(32.W))
   val n         = RegInit( 0.U(32.W))
   val base      = RegInit( 0.U(32.W))
@@ -85,11 +94,10 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator)(implicit p: Pa
   dontTouch(base_ip)
   dontTouch(next_emit)
   dontTouch(ip_limit)
-  dontTouch(next_hash)
+  dontTouch(hash)
   dontTouch(skip)
   dontTouch(ip)
   dontTouch(candidate)
-  dontTouch(bbhl)
   dontTouch(op)
   dontTouch(n)
   dontTouch(base)
@@ -99,127 +107,92 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator)(implicit p: Pa
   dontTouch(s2)
   dontTouch(toCopy)
 
-  val test1: UInt = Wire(UInt(64.W))
-  val test2: UInt = Wire(UInt(64.W))
-  dontTouch(test1)
-  dontTouch(test2)
-  test1 := mainMemory.io.readData1.asUInt()(31,0)
-  test2 := mainMemory.io.readData2.asUInt()(31,0)
+  // define bytes between hash lookups for searching for matches
+  val bbhl: UInt = Wire(UInt(32.W))
+  bbhl := (skip >> 5.U).asUInt()
+  dontTouch(bbhl)
 
-  val tempReadAddress = RegInit(0.U(32.W))
+  // create the hash table and connect it
+  val hashTable = Module(BasicMem(MemParameters(params.hashTableSize, 16, syncRead = false, bypass = false)))
+  hashTable.io.writeAddress := hash
+  hashTable.io.writeData := ip - base_ip
+  hashTable.io.writeEnable := true.B
+  hashTable.io.readAddress := hash
+  candidate := hashTable.io.readData
+
+  prev_ip := ip
+  skip := skip + bbhl
+  ip := ip + bbhl
+
+  // index into hash table
+  hash := Hash(ip + (skip >> 5.U).asUInt(), shift)
+
+
+//  match = true if mem[ip] == mem[candidate]
+//  val matchFound: Bool = Wire(Bool())
+//  matchFound :=
 
   // state machine
   when(state === sLookForMatch) {
-    prev_ip := ip
-    bbhl := (skip >> 5.U).asUInt()
-    skip := skip + (skip >> 5.U).asUInt()
-    ip := ip + (skip >> 5.U).asUInt()
     when(ip > ip_limit) {
       state := sEmitRemainder
     }.otherwise {
-      next_hash := Hash(ip + (skip >> 5.U).asUInt(), shift)
 
-      //TODO: why do chisel printf's not support \t or %3d?
-      printf("Compare:  mem[%d]  mem[%d]\n", candidate, ip)
-
-      //TODO: figure out how to access the memory
-      mainMemory.io.readAddress1 := ip
-      mainMemory.io.readAddress2 := candidate
-      when(mainMemory.io.readData1.asUInt()(31,0) === mainMemory.io.readData2.asUInt()(31,0)) {
-        state := sEmitLiteral
-        count := 0.U
-        base := op
-        toCopy := ip - next_emit
-        when(ip - next_emit > 60.U) {
-          // length > 60 means we need to emit the the length partly as additional bytes after the tag, so we do that in the next state
-          n := ip - next_emit - 1.U
-        }.otherwise {
-          // length <= 60 means we can encode the length in the tag byte, so do it now and set n to 0
-          //TODO: figure out how to access the memory
-          mainMemory.io.writeAddress := op
-          mainMemory.io.writeData(0) := ((ip - next_emit - 1.U)<<2).asUInt()
-          mainMemory.io.writeEnable(0) := true.B
-          n := 0.U
-        }
-        op := op + 1.U
-      }
+//      //TODO: why do chisel printf's not support \t or %3d?
+//      printf("Compare:  mem[%d]  mem[%d]\n", candidate, ip)
+//
+//      //TODO: figure out how to access the memory
+//      mainMemory.io.readAddress1 := ip
+//      mainMemory.io.readAddress2 := candidate
+//      when(mainMemory.io.readData1.asUInt()(31, 0) === mainMemory.io.readData2.asUInt()(31, 0)) {
+//        state := sEmitLiteral
+//        count := 0.U
+//        base := op
+//        toCopy := ip - next_emit
+//        when(ip - next_emit > 60.U) {
+//          // length > 60 means we need to emit the the length partly as additional bytes after the tag, so we do that in the next state
+//          n := ip - next_emit - 1.U
+//        }.otherwise {
+//          // length <= 60 means we can encode the length in the tag byte, so do it now and set n to 0
+//          //TODO: figure out how to access the memory
+//          mainMemory.io.writeAddress := op
+//          mainMemory.io.writeData(0) := ((ip - next_emit - 1.U) << 2).asUInt()
+//          mainMemory.io.writeEnable(0) := true.B
+//          n := 0.U
+//        }
+//        op := op + 1.U
+//      }
     }
-  }.elsewhen(state === sEmitLiteral) {
-    when(n > 0.U) {
-      // n > 0 means we are emitting the tag byte(s) and n > 60
-      //TODO: figure out how to access the memory
-      mainMemory.io.writeAddress := base
-      mainMemory.io.writeData(op - base) := n & 0xFF.U
-      mainMemory.io.writeEnable(op - base) := true.B
-      op := op + 1.U
-      n := (n >> 8.U).asUInt()
-      count := count + 1.U
-      when((n >> 8.U).asUInt() <= 0.U) {
-        // we have reached the end of the tag bytes
-        //TODO: figure out how to access the memory
-        mainMemory.io.writeData(0) := ((count + 59.U) << 2.U).asUInt()
-        mainMemory.io.writeEnable(0) := true.B
-      }
-    }.otherwise {
-      // n <= 0 means we are just copying data
-      toCopy := Mux(toCopy <= 8.U, 0.U, toCopy - 8.U)
-      op := op + Mux(toCopy <= 8.U, toCopy, 8.U)
-      next_emit := next_emit + Mux(toCopy <= 8.U, toCopy, 8.U)
-      mainMemory.io.writeAddress := op
-      mainMemory.io.readAddress1 := next_emit
-      for(i <- 0 until 8) {
-        mainMemory.io.writeData(i) := mainMemory.io.readData1(i)
-        mainMemory.io.writeEnable(i) := Mux(i.U < toCopy, true.B, false.B)
-      }
-      when(toCopy === 0.U) {
-        state := sEmitCopy
-        matched := 0.U
-        s2 := prev_ip + 4.U
-        base := prev_ip
-      }
-    }
-  }.elsewhen(state === sEmitCopy) {
-    mainMemory.io.readAddress2 := tempReadAddress
-    tempReadAddress := tempReadAddress + 1.U
-  }.elsewhen(state === sEmitRemainder) {
+  }
 
-  }.otherwise /*(state === sIdle)*/ {
-    when(cmd.fire()) {
-      when(doSetLength) {
-        length := cmd.bits.rs1
-      }.elsewhen(doCompress) {
-        busy := true.B
-        op := cmd.bits.rs2
-        src := cmd.bits.rs1
-        dst := cmd.bits.rs2
-        ip_end := cmd.bits.rs1 + length
-        base_ip := cmd.bits.rs1
-        next_emit := cmd.bits.rs1
-        when(length < kInputMarginBytes) {
-          state := sEmitRemainder
-        }.otherwise {
-          state := sLookForMatch
-          ip_limit := cmd.bits.rs1 + length - kInputMarginBytes
-          next_hash := Hash(cmd.bits.rs1 + 1.U, shift)
-          ip := cmd.bits.rs1 + 1.U
-        }
-      }.elsewhen(doUncompress) {
-        busy := true.B
-        // ...
-      }
+  // initialize each operation
+  when(cmd.fire()) {
+    when(doSetLength) {
+      length := cmd.bits.rs1
+    }.elsewhen(doCompress) {
+      //TODO: some of the signals are redundant
+      busy := true.B
+      op := cmd.bits.rs2
+      src := cmd.bits.rs1
+      dst := cmd.bits.rs2
+      ip_end := cmd.bits.rs1 + length
+      base_ip := cmd.bits.rs1
+      next_emit := cmd.bits.rs1
+      ip_limit := cmd.bits.rs1 + length - kInputMarginBytes
+      hash := Hash(cmd.bits.rs1 + 1.U, shift)
+      ip := cmd.bits.rs1 + 1.U
+    }.elsewhen(doUncompress) {
+      busy := true.B
+      // ...
     }
   }
 
 
-
-
+  //TODO: figure out how to use these properly
   io.mem.req.valid := false.B
-  io.resp.valid := false.B
+  io.resp.valid := candidate =/= 0.U
   io.resp.bits.rd := RegNext(io.resp.bits.rd)
   io.resp.bits.data := (-1).S(xLen.W).asUInt()
-
-  cmd.ready := !busy
-  io.busy := busy
   io.interrupt := false.B
 }
 

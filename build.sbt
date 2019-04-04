@@ -26,8 +26,12 @@ def conditionalDependsOn(prj: Project): Project = {
   ))
 }
 
+lazy val icenet = conditionalDependsOn(project in file("./icenet"))
+  .settings(commonSettings)
+
 lazy val example = conditionalDependsOn(project in file("."))
   .settings(commonSettings)
+  .dependsOn(icenet)
 
 lazy val tapeout = conditionalDependsOn(project in file("./barstools/tapeout/"))
   .settings(commonSettings)

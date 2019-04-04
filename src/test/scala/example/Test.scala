@@ -7,8 +7,7 @@ import freechips.rocketchip.diplomacy.LazyModule
 import freechips.rocketchip.tile.OpcodeSet
 import org.scalatest.{FlatSpec, Matchers}
 import treadle.TreadleTester
-
-import scala.io.Source
+import example.TreadleTesterMemFunctions._
 
 class CompressionAcceleratorTester(c: CompressionAcceleratorModule) extends PeekPokeTester(c) {
   // set length
@@ -45,8 +44,10 @@ class TreadleTest extends FlatSpec with Matchers {
     val s = chisel3.Driver.emit(() => LazyModule(new CompressionAccelerator(OpcodeSet.custom3)).module)
     implicit val tester: TreadleTester = new TreadleTester(s)
 
+    tester.engine.makeVCDLogger("results/treadlevcd.vcd", showUnderscored = true)
+
     // set up memory
-    val mem = "mainMemory.mem_0"
+    val mem = "hashTable.mem_0"
     loadMemFromFile("memdata/memdata_0.txt", mem)
 
     // start compression
@@ -72,30 +73,7 @@ class TreadleTest extends FlatSpec with Matchers {
         dump128Mem(mem)
       }
     }
-  }
 
-  // returns the first 128 bytes of a memory
-  def read128Mem(mem: String)(implicit tester: TreadleTester): Seq[BigInt] = {
-    var arr: Seq[BigInt] = Seq()
-    for(i <- 0 until 128) {
-      arr = arr :+ tester.peekMemory(mem, i)
-    }
-    arr
-  }
-
-  // prints the first 128 bytes of a memory
-  def dump128Mem(mem: String)(implicit tester: TreadleTester): Unit = {
-    for(i <- 0 until 128) {
-      print(if(i%8==0) "\n" else " ")
-      print(tester.peekMemory(mem, i))
-    }
-    println("")
-  }
-
-  // loads data into a memory from a file
-  def loadMemFromFile(filename: String, mem: String)(implicit tester: TreadleTester): Unit = {
-    for((element, index) <- Source.fromFile(filename).getLines().zipWithIndex) {
-      tester.pokeMemory(mem, index, element.toInt)
-    }
+    tester.engine.writeVCD()
   }
 }
