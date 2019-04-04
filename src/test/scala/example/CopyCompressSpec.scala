@@ -85,8 +85,18 @@ class CopyCompressSpec extends FlatSpec with Matchers{
     goldenRes.foreach((a) => println(a.toString(16)))
 
     it should "Test copy compression case 2" in{
-        DoCopyCompressTester(params, candidateVec, dataVec, offsetVec, goldenRes) should be (true)
-    }   
+       DoCopyCompressTesterLane1(params, candidateVec, dataVec, offsetVec, goldenRes) should be (true)
+    }  
+    
+    val params_2 = new CopyCompressParams{
+        val parallellane = 2
+    }
+    print(params_2.parallellane)
+
+    it should "Test copy compression case 3" in{
+       DoCopyCompressTesterLane2(params_2, candidateVec, dataVec, offsetVec, goldenRes) should be (true)
+    }
+    
 
 
 }

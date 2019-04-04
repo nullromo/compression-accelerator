@@ -76,7 +76,15 @@ class CopyCompressTester(c: CopyCompress, params: CopyCompressParams, candidateV
     step(10)
 }
 
-object DoCopyCompressTester {
+object DoCopyCompressTesterLane1 {
+    def apply(params: CopyCompressParams, candidateVec: Seq[Seq[Int]], dataVec: Seq[Seq[Int]], offsetVec: Seq[BigInt], goldenRes: Seq[BigInt]): Boolean = {
+        chisel3.iotesters.Driver.execute(Array("-tbn", "verilator", "-fiwv"), () => new CopyCompress(params)) {
+            c => new CopyCompressTester(c, params, candidateVec, dataVec, offsetVec, goldenRes)
+        }
+    }
+}
+
+object DoCopyCompressTesterLane2 {
     def apply(params: CopyCompressParams, candidateVec: Seq[Seq[Int]], dataVec: Seq[Seq[Int]], offsetVec: Seq[BigInt], goldenRes: Seq[BigInt]): Boolean = {
         chisel3.iotesters.Driver.execute(Array("-tbn", "verilator", "-fiwv"), () => new CopyCompress(params)) {
             c => new CopyCompressTester(c, params, candidateVec, dataVec, offsetVec, goldenRes)
