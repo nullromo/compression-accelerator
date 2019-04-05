@@ -24,32 +24,23 @@ object DefaultCompressionParameters extends CompressionParameters(
 class CompressionAccelerator(opcodes: OpcodeSet, params: CompressionParameters = DefaultCompressionParameters)(implicit p: Parameters)
   extends LazyRoCC(opcodes, nPTWPorts = 1) {
   override lazy val module = new CompressionAcceleratorModule(this, params)
-//  val scratchpad = LazyModule(new Scratchpad(params.scratchpadBanks, params.scratchpadEntries, params.scratchpadWidth))
-//  override val tlNode: TLIdentityNode = scratchpad.node
+  val scratchpad = LazyModule(new Scratchpad(params.scratchpadBanks, params.scratchpadEntries, params.scratchpadWidth))
+  override val tlNode: TLIdentityNode = scratchpad.node
 }
 
 class CompressionAcceleratorModule(outer: CompressionAccelerator, params: CompressionParameters)(implicit p: Parameters)
   extends LazyRoCCModuleImp(outer) with HasCoreParameters {
 
   // get a reference to the scratchpad inside the implementation module
-//  import outer.scratchpad
+  import outer.scratchpad
 
   // connect the scratchpad to the L2 cache
-//  implicit val edge: TLEdgeOut = outer.tlNode.edges.out.head
-//  val tlb = Module(new FrontendTLB(1, 4))
-//  tlb.io.clients(0) <> scratchpad.module.io.tlb
-//  io.ptw.head <> tlb.io.ptw
+  implicit val edge: TLEdgeOut = outer.tlNode.edges.out.head
+  val tlb = Module(new FrontendTLB(1, 4))
+  tlb.io.clients(0) <> scratchpad.module.io.tlb
+  io.ptw.head <> tlb.io.ptw
 
   //TODO: change all the magic numbers to parameters
-
-  // STATE MACHINE
-  //          sIdle: waiting for a RoCC command
-  //  sLookForMatch: searching for a 4-byte match
-  //   sEmitLiteral: feed the literal opcode and data to the output
-  //      sEmitCopy: emit copy tags until there is no repeated data
-  // sEmitRemainder: emit the end of a stream as a literal
-  val sIdle :: sLookForMatch :: sEmitLiteral :: sEmitCopy :: sEmitRemainder :: Nil = Enum(5)
-  val state = RegInit(sIdle)
 
   // get the RoCC command
   val cmd = Queue(io.cmd)
@@ -127,43 +118,69 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   // index into hash table
   hash := Hash(ip + (skip >> 5.U).asUInt(), shift)
 
+  // create arbiter so that multiple addresses can be read at once
+  //TODO: just modify scratchpadBank to have 2 underlying read ports instead
+  val scratchpadArbiter = Module(new DecoupledArbiter(32, 8, 2))
 
-//  match = true if mem[ip] == mem[candidate]
-//  val matchFound: Bool = Wire(Bool())
-//  matchFound :=
+  // connect arbiter to scratchpad
+  scratchpad.module.io.read(0).en := true.B
+  scratchpad.module.io.read(0).addr := scratchpadArbiter.io.memAddress
 
-  // state machine
-  when(state === sLookForMatch) {
-    when(ip > ip_limit) {
-      state := sEmitRemainder
-    }.otherwise {
+  //TODO: this is the goal
+  //match = true if mem[ip] == mem[candidate]
+  //val matchFound: Bool = Wire(Bool())
+  //matchFound :=
 
-//      //TODO: why do chisel printf's not support \t or %3d?
-//      printf("Compare:  mem[%d]  mem[%d]\n", candidate, ip)
-//
-//      //TODO: figure out how to access the memory
-//      mainMemory.io.readAddress1 := ip
-//      mainMemory.io.readAddress2 := candidate
-//      when(mainMemory.io.readData1.asUInt()(31, 0) === mainMemory.io.readData2.asUInt()(31, 0)) {
-//        state := sEmitLiteral
-//        count := 0.U
-//        base := op
-//        toCopy := ip - next_emit
-//        when(ip - next_emit > 60.U) {
-//          // length > 60 means we need to emit the the length partly as additional bytes after the tag, so we do that in the next state
-//          n := ip - next_emit - 1.U
-//        }.otherwise {
-//          // length <= 60 means we can encode the length in the tag byte, so do it now and set n to 0
-//          //TODO: figure out how to access the memory
-//          mainMemory.io.writeAddress := op
-//          mainMemory.io.writeData(0) := ((ip - next_emit - 1.U) << 2).asUInt()
-//          mainMemory.io.writeEnable(0) := true.B
-//          n := 0.U
-//        }
-//        op := op + 1.U
-//      }
-    }
+
+
+
+
+/*
+Big paste to see if it matters if these are connected.
+ */
+class SPAddr(xLen: Int, sp_banks: Int, sp_bank_entries: Int) extends Bundle {
+  val junk = UInt((xLen-log2Ceil(sp_bank_entries)-log2Ceil(sp_banks)).W)
+  val spbank = UInt(log2Ceil(sp_banks).W)
+  val sprow = UInt(log2Ceil(sp_bank_entries).W)
+
+  override def cloneType: SPAddr.this.type = new SPAddr(xLen, sp_banks, sp_bank_entries).asInstanceOf[this.type]
+}
+val spaddr = new SPAddr(xLen, params.scratchpadBanks, params.scratchpadEntries)
+  val perform_store = WireInit(false.B)
+  val perform_load = WireInit(false.B)
+  scratchpad.module.io.dma.resp.ready := true.B // The controller discards DMA responses
+  // For both mvin and mvout, rs1 = DRAM address, rs2 = scratchpad address
+  scratchpad.module.io.dma.req.bits.vaddr := cmd.bits.rs1
+  scratchpad.module.io.dma.req.bits.spbank := cmd.bits.rs2.asTypeOf(spaddr).spbank
+  scratchpad.module.io.dma.req.bits.spaddr := cmd.bits.rs2.asTypeOf(spaddr).sprow
+
+  scratchpad.module.io.dma.req.valid := false.B
+  scratchpad.module.io.dma.req.bits.write := false.B
+  // TODO: spad.module.io.dma.req.valid should be asserted before waiting for ready (potential deadlock)
+  when (perform_load && scratchpad.module.io.dma.req.ready){
+    scratchpad.module.io.dma.req.valid := true.B
+    scratchpad.module.io.dma.req.bits.write := false.B
   }
+  when (perform_load && scratchpad.module.io.dma.resp.valid) {
+//    cmd.pop := 1.U
+  }
+
+  when (perform_store && scratchpad.module.io.dma.req.ready) {
+    scratchpad.module.io.dma.req.valid := true.B
+    scratchpad.module.io.dma.req.bits.write := true.B
+  }
+  when (perform_store && scratchpad.module.io.dma.resp.valid) { // assumes no page faults occur
+//    cmd.pop := 1.U
+  }
+
+/*
+End big paste
+ */
+
+
+
+
+
 
   // initialize each operation
   when(cmd.fire()) {
