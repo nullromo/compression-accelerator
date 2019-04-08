@@ -10,3 +10,8 @@ target
 simv*
 *.vcd
 .DS_Store
+results/
+.idea/
+test_run_dir/
+verisim/DVEfiles/
+verisim/opendatabase.log
