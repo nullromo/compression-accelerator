@@ -13,6 +13,7 @@ case class CompressionParameters(hashTableSize: Int,
                                  scratchpadBanks: Int,
                                  scratchpadEntries: Int,
                                  scratchpadWidth: Int) {
+  val scratchpadEntryBits = log2Ceil(scratchpadEntries)
 }
 
 object DefaultCompressionParameters extends CompressionParameters(
@@ -118,20 +119,28 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   // index into hash table
   hash := Hash(ip + (skip >> 5.U).asUInt(), shift)
 
-  // create arbiter so that multiple addresses can be read at once
-  //TODO: just modify scratchpadBank to have 2 underlying read ports instead
-//  val scratchpadArbiter = Module(new DecoupledArbiter(32, 8, 2))
 
-  // connect arbiter to scratchpad
-//  scratchpad.module.io.read(0).en := true.B
-//  scratchpad.module.io.read(0).addr := scratchpadArbiter.io.memAddress
+
+  // hold the address of the lowest value in the hash table
+  val oldestInput = RegInit(0.U(32.W))
+
+
+
+  val scratchpadBufferController = Module(new CircularBuffer(params.scratchpadEntries, params.scratchpadWidth))
+  
+
+
 
   //TODO: this is the goal
   //match = true if mem[ip] == mem[candidate]
   val matchFound: Bool = Wire(Bool())
-  matchFound := scratchpad.module.io.read(0)(0).data === scratchpad.module.io.read(0)(1).data
   dontTouch(matchFound)
-  io.mem.req.valid := matchFound
+
+  matchFound := scratchpad.module.io.read(0)(0).data === scratchpad.module.io.read(0)(1).data
+
+
+
+
 
   // initialize each operation
   when(cmd.fire()) {
@@ -157,7 +166,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 
 
   //TODO: figure out how to use these properly
-//  io.mem.req.valid := false.B
+  io.mem.req.valid := false.B
   io.resp.valid := candidate =/= 0.U
   io.resp.bits.rd := RegNext(io.resp.bits.rd)
   io.resp.bits.data := (-1).S(xLen.W).asUInt()
