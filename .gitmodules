@@ -7,3 +7,6 @@
 [submodule "barstools"]
 	path = barstools
 	url = https://github.com/ucb-bar/barstools.git
+[submodule "icenet"]
+	path = icenet
+	url = https://github.com/firesim/icenet
