@@ -128,11 +128,10 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 
   //TODO: this is the goal
   //match = true if mem[ip] == mem[candidate]
-  //val matchFound: Bool = Wire(Bool())
-  //matchFound :=
-
-
-
+  val matchFound: Bool = Wire(Bool())
+  matchFound := scratchpad.module.io.read(0)(0).data === scratchpad.module.io.read(0)(1).data
+  dontTouch(matchFound)
+  io.mem.req.valid := matchFound
 
   // initialize each operation
   when(cmd.fire()) {
@@ -158,7 +157,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 
 
   //TODO: figure out how to use these properly
-  io.mem.req.valid := false.B
+//  io.mem.req.valid := false.B
   io.resp.valid := candidate =/= 0.U
   io.resp.bits.rd := RegNext(io.resp.bits.rd)
   io.resp.bits.data := (-1).S(xLen.W).asUInt()

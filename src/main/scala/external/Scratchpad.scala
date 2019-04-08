@@ -119,7 +119,7 @@ class ScratchpadWriteIO(val n: Int, val w: Int) extends Bundle {
 
 class ScratchpadBank(n: Int, w: Int) extends Module {
   val io = IO(new Bundle {
-    val read = Flipped(new ScratchpadReadIO(n, w))
+    val read = Flipped(Vec(2, new ScratchpadReadIO(n, w)))
     val write = Flipped(new ScratchpadWriteIO(n, w))
   })
 
@@ -127,7 +127,8 @@ class ScratchpadBank(n: Int, w: Int) extends Module {
 
   when (io.write.en) { mem.write(io.write.addr, io.write.data) }
 
-  io.read.data := mem.read(io.read.addr, io.read.en)
+  io.read(0).data := mem.read(io.read(0).addr, io.read(0).en)
+  io.read(1).data := mem.read(io.read(1).addr, io.read(1).en)
 }
 
 class Scratchpad(
@@ -150,7 +151,7 @@ class Scratchpad(
   lazy val module = new LazyModuleImp(this) with HasCoreParameters {
     val io = IO(new Bundle {
       val dma = Flipped(new ScratchpadMemIO(nBanks, nRows))
-      val read  = Flipped(Vec(nBanks, new ScratchpadReadIO(nRows, w)))
+      val read  = Flipped(Vec(nBanks, Vec(2, new ScratchpadReadIO(nRows, w))))
       val write = Flipped(Vec(nBanks, new ScratchpadWriteIO(nRows, w)))
       val tlb = new FrontendTLBIO
     })
@@ -255,10 +256,14 @@ class Scratchpad(
       val bankren = dmaren && io.dma.req.bits.spbank === i.U
       val bankwen = dmawen && req.spbank === i.U
 
-      bank.io.read.en := bankren || read.en
-      bank.io.read.addr := Mux(bankren, io.dma.req.bits.spaddr, read.addr)
-      read.data := bank.io.read.data
-      when (req.spbank === i.U) { dmardata := bank.io.read.data }
+      bank.io.read(0).en := bankren || read(0).en
+      bank.io.read(1).en := bankren || read(1).en
+      bank.io.read(0).addr := Mux(bankren, io.dma.req.bits.spaddr, read(0).addr)
+      bank.io.read(1).addr := Mux(bankren, io.dma.req.bits.spaddr, read(1).addr)
+      read(0).data := bank.io.read(0).data
+      read(1).data := bank.io.read(1).data
+      when (req.spbank === i.U) { dmardata := bank.io.read(0).data }
+      when (req.spbank === i.U) { dmardata := bank.io.read(1).data }
 
       bank.io.write.en := bankwen || write.en
       bank.io.write.addr := Mux(bankwen, req.spaddr, write.addr)

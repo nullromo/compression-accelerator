@@ -41,13 +41,13 @@ class TreadleTest extends FlatSpec with Matchers {
   implicit val p: Parameters = AcceleratorParams()
 
   "Something" should "do something" in {
-    val s = chisel3.Driver.emit(() => LazyModule(new CompressionAccelerator(OpcodeSet.custom3)).module)
+    val s = chisel3.Driver.emit(() => LazyModule(new ScratchpadTest(OpcodeSet.custom3)).module)
     implicit val tester: TreadleTester = new TreadleTester(s)
 
     tester.engine.makeVCDLogger("results/treadlevcd.vcd", showUnderscored = true)
 
     // set up memory
-    val mem = "hashTable.mem_0"
+    val mem = "ram.mem_0"
     loadMemFromFile("memdata/memdata_0.txt", mem)
 
     // start compression
