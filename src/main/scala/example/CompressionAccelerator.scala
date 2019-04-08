@@ -120,64 +120,16 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 
   // create arbiter so that multiple addresses can be read at once
   //TODO: just modify scratchpadBank to have 2 underlying read ports instead
-  val scratchpadArbiter = Module(new DecoupledArbiter(32, 8, 2))
+//  val scratchpadArbiter = Module(new DecoupledArbiter(32, 8, 2))
 
   // connect arbiter to scratchpad
-  scratchpad.module.io.read(0).en := true.B
-  scratchpad.module.io.read(0).addr := scratchpadArbiter.io.memAddress
+//  scratchpad.module.io.read(0).en := true.B
+//  scratchpad.module.io.read(0).addr := scratchpadArbiter.io.memAddress
 
   //TODO: this is the goal
   //match = true if mem[ip] == mem[candidate]
   //val matchFound: Bool = Wire(Bool())
   //matchFound :=
-
-
-
-
-
-/*
-Big paste to see if it matters if these are connected.
- */
-class SPAddr(xLen: Int, sp_banks: Int, sp_bank_entries: Int) extends Bundle {
-  val junk = UInt((xLen-log2Ceil(sp_bank_entries)-log2Ceil(sp_banks)).W)
-  val spbank = UInt(log2Ceil(sp_banks).W)
-  val sprow = UInt(log2Ceil(sp_bank_entries).W)
-
-  override def cloneType: SPAddr.this.type = new SPAddr(xLen, sp_banks, sp_bank_entries).asInstanceOf[this.type]
-}
-val spaddr = new SPAddr(xLen, params.scratchpadBanks, params.scratchpadEntries)
-  val perform_store = WireInit(false.B)
-  val perform_load = WireInit(false.B)
-  scratchpad.module.io.dma.resp.ready := true.B // The controller discards DMA responses
-  // For both mvin and mvout, rs1 = DRAM address, rs2 = scratchpad address
-  scratchpad.module.io.dma.req.bits.vaddr := cmd.bits.rs1
-  scratchpad.module.io.dma.req.bits.spbank := cmd.bits.rs2.asTypeOf(spaddr).spbank
-  scratchpad.module.io.dma.req.bits.spaddr := cmd.bits.rs2.asTypeOf(spaddr).sprow
-
-  scratchpad.module.io.dma.req.valid := false.B
-  scratchpad.module.io.dma.req.bits.write := false.B
-  // TODO: spad.module.io.dma.req.valid should be asserted before waiting for ready (potential deadlock)
-  when (perform_load && scratchpad.module.io.dma.req.ready){
-    scratchpad.module.io.dma.req.valid := true.B
-    scratchpad.module.io.dma.req.bits.write := false.B
-  }
-  when (perform_load && scratchpad.module.io.dma.resp.valid) {
-//    cmd.pop := 1.U
-  }
-
-  when (perform_store && scratchpad.module.io.dma.req.ready) {
-    scratchpad.module.io.dma.req.valid := true.B
-    scratchpad.module.io.dma.req.bits.write := true.B
-  }
-  when (perform_store && scratchpad.module.io.dma.resp.valid) { // assumes no page faults occur
-//    cmd.pop := 1.U
-  }
-
-/*
-End big paste
- */
-
-
 
 
 
