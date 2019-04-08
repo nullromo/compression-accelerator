@@ -9,7 +9,7 @@ import org.scalatest.{FlatSpec, Matchers}
 import treadle.TreadleTester
 import example.TreadleTesterMemFunctions._
 
-class CompressionAcceleratorTester(c: CompressionAcceleratorModule) extends PeekPokeTester(c) {
+class CompressionAcceleratorTester(c: ScratchpadTestModule) extends PeekPokeTester(c) {
   // set length
   poke(c.io.cmd.bits.inst.funct, 2) // doSetLength
   poke(c.io.cmd.bits.rs1, 100) // length = 100
@@ -29,7 +29,7 @@ class CompressionAcceleratorTester(c: CompressionAcceleratorModule) extends Peek
 class CompressionAcceleratorSpec extends ChiselFlatSpec {
   implicit val p: Parameters = AcceleratorParams()
 
-  val dutGen: () => CompressionAcceleratorModule = () => LazyModule(new CompressionAccelerator(OpcodeSet.custom3)).module
+  val dutGen: () => ScratchpadTestModule = () => LazyModule(new ScratchpadTest(OpcodeSet.custom3)).module
   "CompressionAccelerator" should "accept commands" in {
     Driver.execute(TesterArgs() :+ "CompressionAccelerator", dutGen) {
       c => new CompressionAcceleratorTester(c)
