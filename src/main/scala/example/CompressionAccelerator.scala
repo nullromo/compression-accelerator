@@ -121,13 +121,29 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 
 
 
-  // hold the address of the lowest value in the hash table
+  // hold the lowest address in the hash table
   val oldestInput = RegInit(0.U(32.W))
 
+  // keep track of the range that the scratchpad contains
+  val minScratchpadAddress = RegInit(0.U(32.W))
+  val maxScratchpadAddress = RegInit(0.U(32.W))
 
+  // signals for scratchpad
+  val addToScratchpad: Bool = Wire(Bool())
+  val consumeFromScratchpad: Bool = Wire(Bool())
 
   val scratchpadBufferController = Module(new CircularBuffer(params.scratchpadEntries, params.scratchpadWidth))
-  
+  scratchpadBufferController.io.write := addToScratchpad
+  scratchpadBufferController.io.read := consumeFromScratchpad
+  //TODO: make sure not to read and write the scratchpad at the same time if it's empty or full
+
+  when(!scratchpadBufferController.io.full) {
+    //todo: make the read request
+    scratchpad.module.io.dma.req.valid := true.B
+
+
+    maxScratchpadAddress := maxScratchpadAddress + 8.U
+  }
 
 
 
