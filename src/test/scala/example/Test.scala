@@ -8,6 +8,11 @@ import freechips.rocketchip.tile.OpcodeSet
 import org.scalatest.{FlatSpec, Matchers}
 import treadle.TreadleTester
 import example.TreadleTesterMemFunctions._
+import scala.util.Random
+import scala.math._
+import java.io.File
+import java.io.PrintWriter
+
 
 class CompressionAcceleratorTester(c: ScratchpadTestModule) extends PeekPokeTester(c) {
   // set length
@@ -46,9 +51,31 @@ class TreadleTest extends FlatSpec with Matchers {
 
     tester.engine.makeVCDLogger("results/treadlevcd.vcd", showUnderscored = true)
 
+	val randgen = new Random(15)
+	val memory_data = Array.fill[Seq[Int]](8)(Array.fill[Int]((pow(2,10)-1).toInt)(randgen.nextInt(256)))
+
+	for(i <- 0 until 8){
+		val fileName = "memdata/memdata_" + i + ".txt"
+		val writer = new PrintWriter(new File(fileName))
+		for(k <- 0 until memory_data(i).length){
+			writer.write(memory_data(i)(k).toString)
+			if(k != memory_data(i).length-1)
+				writer.write("\n")
+		}
+		writer.close() 
+		print("finsih 1 file write!\n")
+		//val mem = "ram.mem_" + i
+		//loadMemFromFile(fileName, mem)
+	}
+
+	val mem_array = Array.ofDim[String](8)
+	mem_array.zipWithIndex.foreach{case(mem, k) => mem_array(k) = "ram.mem_" + k
+												   val fileName = "memdata/memdata_"+k+".txt"
+												   loadMemFromFile(fileName, mem_array(k))}
+
     // set up memory
-    val mem = "ram.mem_0"
-    loadMemFromFile("memdata/memdata_0.txt", mem)
+   	// val mem = "ram.mem_0"
+    // loadMemFromFile("memdata/memdata_0.txt", mem)
 
     // start compression
     tester.poke("io_cmd_bits_inst_funct", 2)
@@ -66,11 +93,11 @@ class TreadleTest extends FlatSpec with Matchers {
 
     for(i <- 0 until 500) {
       tester.step()
-      val newDump = read128Mem(mem)
+      val newDump = read128Mem(mem_array(0))
       if(dump != newDump) {
         dump = newDump
         println("Cycle " + i)
-        dump128Mem(mem)
+        dump128Mem(mem_array(0))
       }
     }
 
