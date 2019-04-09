@@ -34,11 +34,12 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 
   // get a reference to the scratchpad inside the implementation module
   import outer.scratchpad
+  val scratchpadIO = scratchpad.module.io
 
   // connect the scratchpad to the L2 cache
   implicit val edge: TLEdgeOut = outer.tlNode.edges.out.head
   val tlb = Module(new FrontendTLB(1, 4))
-  tlb.io.clients(0) <> scratchpad.module.io.tlb
+  tlb.io.clients(0) <> scratchpadIO.tlb
   io.ptw.head <> tlb.io.ptw
 
   //TODO: change all the magic numbers to parameters
@@ -64,13 +65,11 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   io.busy := busy
 
   // components for state machine
-  val shift: UInt = (32 - log2Floor(params.hashTableSize)).U
   val ip_end    = RegInit( 0.U(32.W))
   val base_ip   = RegInit( 0.U(32.W))
   val next_emit = RegInit( 0.U(32.W))
   val kInputMarginBytes: UInt = 15.U
   val ip_limit  = RegInit( 0.U(32.W))
-  val hash      = RegInit( 0.U(32.W))
   val skip      = RegInit(32.U(32.W))
   val ip        = RegInit( 0.U(32.W))
   val candidate = RegInit( 0.U(32.W))
@@ -83,7 +82,6 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   dontTouch(base_ip)
   dontTouch(next_emit)
   dontTouch(ip_limit)
-  dontTouch(hash)
   dontTouch(skip)
   dontTouch(ip)
   dontTouch(candidate)
@@ -98,20 +96,38 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   bbhl := (skip >> 5.U).asUInt()
   dontTouch(bbhl)
 
-  // create the hash table and connect it
-  val hashTable = Module(BasicMem(MemParameters(params.hashTableSize, 16, syncRead = false, bypass = false)))
-  hashTable.io.writeAddress := hash
-  hashTable.io.writeData := ip - base_ip
-  hashTable.io.writeEnable := true.B
-  hashTable.io.readAddress := hash
-  candidate := hashTable.io.readData
+  // create the hash table
+  val hashTable = Module(new HashTable(32, 16, params.hashTableSize))
+
+  // values coming out of the hash table
+  val oldCandidateData: UInt = Wire(UInt(32.W))
+  val oldCandidateOffset: UInt = Wire(UInt(16.W))
+
+  // values going into the hash table
+  val newCandidateData: UInt = Wire(UInt(32.W))
+  val newCandidateOffset: UInt = Wire(UInt(16.W))
+  newCandidateData := scratchpadIO.read(0)(0).data
+  newCandidateOffset := ip - base_ip
+
+  // connect hash table
+  hashTable.io.newData := newCandidateData
+  hashTable.io.newOffset := newCandidateOffset
+  oldCandidateData := hashTable.io.oldData
+  oldCandidateOffset := hashTable.io.oldOffset
+
+  //TODO: this will have some more control logic
+  hashTable.io.enable := true.B
+
+  // ture when a match has been found
+  val matchFound: Bool = Wire(Bool())
+  matchFound := oldCandidateData === newCandidateData
+
+
+
 
   prev_ip := ip
   skip := skip + bbhl
   ip := ip + bbhl
-
-  // index into hash table
-  hash := Hash(ip + (skip >> 5.U).asUInt(), shift)
 
 
 
@@ -135,25 +151,18 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   dmaRequestBuffer.noenq()
 
   // always send the buffered requests
-  scratchpad.module.io.dma.req := dmaRequestBuffer.deq()
+  scratchpadIO.dma.req.bits := dmaRequestBuffer.deq()
 
   // if the scratchpad is not full, fill it up by generating a new dma request
   when(!scratchpadBufferController.io.full) {
     //TODO: make sure there are no bugs where we overwrite something
-    dmaRequest := DMAUtils.makeDMARequest(false.B, maxScratchpadAddress, scratchpadBufferController.tail)(params)
+    dmaRequest := DMAUtils.makeDMARequest(false.B, maxScratchpadAddress, scratchpadBufferController.tail)(p, params)
     dmaRequestBuffer.enq(dmaRequest)
     maxScratchpadAddress := maxScratchpadAddress + 8.U
     scratchpadBufferController.io.write := true.B
   }
 
 
-
-  //TODO: this is the goal
-  //match = true if mem[ip] == mem[candidate]
-  val matchFound: Bool = Wire(Bool())
-  dontTouch(matchFound)
-
-  matchFound := scratchpad.module.io.read(0)(0).data === scratchpad.module.io.read(0)(1).data
 
 
 
@@ -173,7 +182,6 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
       base_ip := cmd.bits.rs1
       next_emit := cmd.bits.rs1
       ip_limit := cmd.bits.rs1 + length - kInputMarginBytes
-      hash := Hash(cmd.bits.rs1 + 1.U, shift)
       ip := cmd.bits.rs1 + 1.U
     }.elsewhen(doUncompress) {
       busy := true.B
@@ -191,18 +199,12 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 }
 
 object DMAUtils {
-  def makeDMARequest(write: Bool, virtualAddress: UInt, scratchpadAddress: UInt)(params: CompressionParameters): ScratchpadMemRequest = {
+  def makeDMARequest(write: Bool, virtualAddress: UInt, scratchpadAddress: UInt)(implicit p: Parameters, params: CompressionParameters): ScratchpadMemRequest = {
     val req = new ScratchpadMemRequest(params.scratchpadBanks, params.scratchpadEntries)
     req.vaddr := virtualAddress
     req.spbank := 0.U
     req.spaddr := scratchpadAddress
     req.write := write
     req
-  }
-}
-
-object Hash {
-  def apply(bytes: UInt, shift: UInt): UInt = {
-    (bytes * 0x1e35a7bd.U >> shift).asUInt()
   }
 }
