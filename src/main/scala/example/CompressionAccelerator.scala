@@ -72,7 +72,6 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   val ip_limit  = RegInit( 0.U(32.W))
   val skip      = RegInit(32.U(32.W))
   val ip        = RegInit( 0.U(32.W))
-  val candidate = RegInit( 0.U(32.W))
   val op        = RegInit( 0.U(32.W))
   val n         = RegInit( 0.U(32.W))
   val base      = RegInit( 0.U(32.W))
@@ -84,7 +83,6 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   dontTouch(ip_limit)
   dontTouch(skip)
   dontTouch(ip)
-  dontTouch(candidate)
   dontTouch(op)
   dontTouch(n)
   dontTouch(base)
@@ -142,27 +140,26 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   //TODO: make sure not to read and write the scratchpad at the same time if it's empty or full
 
   // bookkeeper for the dma side of the scratchpad
-  val scratchpadBufferController = Module(new CircularBuffer(params.scratchpadEntries, params.scratchpadWidth))
+  val scratchpadBufferController = Module(new CircularBuffer(params.scratchpadEntries, params.scratchpadEntryBits))
   scratchpadBufferController.io.read := false.B //todo
+  scratchpadBufferController.io.write := false.B
+  scratchpadIO.dma.req.noenq()
 
-  // create a buffer of outstanding dma requests
-  val dmaRequest = new ScratchpadMemRequest(params.scratchpadBanks, params.scratchpadEntries)
-  val dmaRequestBuffer = Queue(Decoupled(dmaRequest))
-  dmaRequestBuffer.noenq()
-
-  // always send the buffered requests
-  scratchpadIO.dma.req.bits := dmaRequestBuffer.deq()
-
-  // if the scratchpad is not full, fill it up by generating a new dma request
-  when(!scratchpadBufferController.io.full) {
-    //TODO: make sure there are no bugs where we overwrite something
-    dmaRequest := DMAUtils.makeDMARequest(false.B, maxScratchpadAddress, scratchpadBufferController.tail)(p, params)
-    dmaRequestBuffer.enq(dmaRequest)
-    maxScratchpadAddress := maxScratchpadAddress + 8.U
-    scratchpadBufferController.io.write := true.B
+  // when the scratchpad is not full, make a dma request
+  when(!scratchpadBufferController.io.full && scratchpadIO.dma.req.ready){
+    //TODO: make sure there are no bugs where we overwrite something (keep the min and max pointers in line)
+    scratchpadIO.dma.req.enq(DMAUtils.makeDMARequest(write = false.B, maxScratchpadAddress, scratchpadBufferController.io.tail)(p, params))
   }
 
-
+  // handle dma responses to the scratchpad
+  when(scratchpadIO.dma.resp.valid) {
+    when(scratchpadIO.dma.resp.bits.error) {
+      printf("DMA returned error=true in a response (page fault?)\n") //TODO: figure out how to handle the error
+    }.otherwise {
+      maxScratchpadAddress := maxScratchpadAddress + 8.U
+      scratchpadBufferController.io.write := true.B
+    }
+  }
 
 
 
@@ -173,6 +170,8 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     when(doSetLength) {
       length := cmd.bits.rs1
     }.elsewhen(doCompress) {
+      minScratchpadAddress := cmd.bits.rs1
+      maxScratchpadAddress := cmd.bits.rs1
       //TODO: some of the signals are redundant
       busy := true.B
       op := cmd.bits.rs2
@@ -192,7 +191,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 
   //TODO: figure out how to use these properly
   io.mem.req.valid := false.B
-  io.resp.valid := candidate =/= 0.U
+  io.resp.valid := false.B
   io.resp.bits.rd := RegNext(io.resp.bits.rd)
   io.resp.bits.data := (-1).S(xLen.W).asUInt()
   io.interrupt := false.B
@@ -200,7 +199,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 
 object DMAUtils {
   def makeDMARequest(write: Bool, virtualAddress: UInt, scratchpadAddress: UInt)(implicit p: Parameters, params: CompressionParameters): ScratchpadMemRequest = {
-    val req = new ScratchpadMemRequest(params.scratchpadBanks, params.scratchpadEntries)
+    val req = Wire(new ScratchpadMemRequest(params.scratchpadBanks, params.scratchpadEntries))
     req.vaddr := virtualAddress
     req.spbank := 0.U
     req.spaddr := scratchpadAddress
