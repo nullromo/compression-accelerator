@@ -3,7 +3,7 @@ package example
 import chisel3._
 import chisel3.core.dontTouch
 import chisel3.util._
-import external.{FrontendTLB, Scratchpad}
+import external.{FrontendTLB, Scratchpad, ScratchpadMemRequest}
 import freechips.rocketchip.config.Parameters
 import freechips.rocketchip.diplomacy.LazyModule
 import freechips.rocketchip.tile._
@@ -79,9 +79,6 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   val base      = RegInit( 0.U(32.W))
   val count     = RegInit( 0.U(32.W))
   val prev_ip   = RegInit( 0.U(32.W))
-  val matched   = RegInit( 0.U(32.W))
-  val s2        = RegInit( 0.U(32.W))
-  val toCopy    = RegInit( 0.U(32.W))
   dontTouch(ip_end)
   dontTouch(base_ip)
   dontTouch(next_emit)
@@ -95,9 +92,6 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   dontTouch(base)
   dontTouch(count)
   dontTouch(prev_ip)
-  dontTouch(matched)
-  dontTouch(s2)
-  dontTouch(toCopy)
 
   // define bytes between hash lookups for searching for matches
   val bbhl: UInt = Wire(UInt(32.W))
@@ -122,27 +116,34 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 
 
   // hold the lowest address in the hash table
+  // TODO: is this necessary? If so, how do we accomplish it?
   val oldestInput = RegInit(0.U(32.W))
 
   // keep track of the range that the scratchpad contains
   val minScratchpadAddress = RegInit(0.U(32.W))
   val maxScratchpadAddress = RegInit(0.U(32.W))
 
-  // signals for scratchpad
-  val addToScratchpad: Bool = Wire(Bool())
-  val consumeFromScratchpad: Bool = Wire(Bool())
-
-  val scratchpadBufferController = Module(new CircularBuffer(params.scratchpadEntries, params.scratchpadWidth))
-  scratchpadBufferController.io.write := addToScratchpad
-  scratchpadBufferController.io.read := consumeFromScratchpad
   //TODO: make sure not to read and write the scratchpad at the same time if it's empty or full
 
+  // bookkeeper for the dma side of the scratchpad
+  val scratchpadBufferController = Module(new CircularBuffer(params.scratchpadEntries, params.scratchpadWidth))
+  scratchpadBufferController.io.read := false.B //todo
+
+  // create a buffer of outstanding dma requests
+  val dmaRequest = new ScratchpadMemRequest(params.scratchpadBanks, params.scratchpadEntries)
+  val dmaRequestBuffer = Queue(Decoupled(dmaRequest))
+  dmaRequestBuffer.noenq()
+
+  // always send the buffered requests
+  scratchpad.module.io.dma.req := dmaRequestBuffer.deq()
+
+  // if the scratchpad is not full, fill it up by generating a new dma request
   when(!scratchpadBufferController.io.full) {
-    //todo: make the read request
-    scratchpad.module.io.dma.req.valid := true.B
-
-
+    //TODO: make sure there are no bugs where we overwrite something
+    dmaRequest := DMAUtils.makeDMARequest(false.B, maxScratchpadAddress, scratchpadBufferController.tail)(params)
+    dmaRequestBuffer.enq(dmaRequest)
     maxScratchpadAddress := maxScratchpadAddress + 8.U
+    scratchpadBufferController.io.write := true.B
   }
 
 
@@ -187,6 +188,17 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   io.resp.bits.rd := RegNext(io.resp.bits.rd)
   io.resp.bits.data := (-1).S(xLen.W).asUInt()
   io.interrupt := false.B
+}
+
+object DMAUtils {
+  def makeDMARequest(write: Bool, virtualAddress: UInt, scratchpadAddress: UInt)(params: CompressionParameters): ScratchpadMemRequest = {
+    val req = new ScratchpadMemRequest(params.scratchpadBanks, params.scratchpadEntries)
+    req.vaddr := virtualAddress
+    req.spbank := 0.U
+    req.spaddr := scratchpadAddress
+    req.write := write
+    req
+  }
 }
 
 object Hash {
