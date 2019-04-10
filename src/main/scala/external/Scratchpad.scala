@@ -189,7 +189,9 @@ class Scratchpad(
     io.tlb.req.bits.cmd := Mux(req.write, M_XWR, M_XRD)
     io.tlb.resp.ready := state === s_translate_resp
 
-    val tlberr = Mux(req.write,
+    // Fake way to bypass TLB!!!!!!!!!!!!
+	//val tlberr = false.B
+	val tlberr = Mux(req.write,
       io.tlb.resp.bits.pf.st || io.tlb.resp.bits.ae.st,
       io.tlb.resp.bits.pf.ld || io.tlb.resp.bits.ae.ld)
 //    printf("pf: %d\n", io.tlb.resp.bits.pf.ld)
@@ -295,7 +297,8 @@ class Scratchpad(
         error := true.B
         state := s_respond
       } .otherwise {
-        reqPpn := io.tlb.resp.bits.paddr >> pgIdxBits.U
+		// Fake way to bypass TLB!!!!!!!!!!!!!!!!
+        reqPpn := /*reqVpn*/io.tlb.resp.bits.paddr >> pgIdxBits.U
         state := Mux(req.write, s_writereq, s_readreq)
       }
     }

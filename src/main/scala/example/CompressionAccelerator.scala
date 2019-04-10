@@ -143,16 +143,20 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   val scratchpadBufferController = Module(new CircularBuffer(params.scratchpadEntries, params.scratchpadEntryBits))
   scratchpadBufferController.io.read := false.B //todo
   scratchpadBufferController.io.write := false.B
-  scratchpadIO.dma.req.noenq()
+  //scratchpadIO.dma.req.noenq()
 
   // when the scratchpad is not full, make a dma request
-  when(!scratchpadBufferController.io.full && scratchpadIO.dma.req.ready){
+  when(!scratchpadBufferController.io.full && busy && scratchpadIO.dma.req.ready){
     //TODO: make sure there are no bugs where we overwrite something (keep the min and max pointers in line)
-    scratchpadIO.dma.req.enq(DMAUtils.makeDMARequest(write = false.B, maxScratchpadAddress, scratchpadBufferController.io.tail)(p, params))
+    scratchpadIO.dma.req.bits := DMAUtils.makeDMARequest(write = false.B, maxScratchpadAddress, scratchpadBufferController.io.tail)(p, params)
+	scratchpadIO.dma.req.valid := true.B
+  }.otherwise{
+	scratchpadIO.dma.req.bits := DMAUtils.makeDMARequest(write = false.B, maxScratchpadAddress, scratchpadBufferController.io.tail)(p, params)
+  	scratchpadIO.dma.req.valid := false.B
   }
 
   // handle dma responses to the scratchpad
-  when(scratchpadIO.dma.resp.valid) {
+  when(scratchpadIO.dma.resp.valid && busy) {
     when(scratchpadIO.dma.resp.bits.error) {
       printf("DMA returned error=true in a response (page fault?)\n") //TODO: figure out how to handle the error
     }.otherwise {

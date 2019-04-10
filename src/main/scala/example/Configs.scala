@@ -2,7 +2,7 @@ package example
 
 import chisel3._
 import freechips.rocketchip.config.{Config, Parameters}
-import freechips.rocketchip.subsystem.{WithNBigCores, WithNMemoryChannels, WithRV32, WithRoccExample}
+import freechips.rocketchip.subsystem.{WithNBigCores, WithNMemoryChannels, WithRV32, WithRoccExample,RocketTilesKey}
 import freechips.rocketchip.diplomacy.{LazyModule, ValName}
 import freechips.rocketchip.devices.tilelink.BootROMParams
 import freechips.rocketchip.rocket.HasRocketCoreParameters
@@ -90,6 +90,8 @@ class WithCompressionAccelerator extends Config((site, here, up) => {
       new CompressionAccelerator(OpcodeSet.custom3)(p)
     )
   )
+  /*case RocketTilesKey => up(RocketTilesKey, site).copy(
+	core = RocketCoreParams(nPMPs = false))*/
 })
 
 class CompressionAcceleratorConfig extends Config(

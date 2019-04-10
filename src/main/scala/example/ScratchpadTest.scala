@@ -36,3 +36,4 @@ class ScratchpadTestModule(outer: ScratchpadTest)(implicit p: Parameters) extend
   val ptw = Module(new DummyPTW(1))
   ptw.io.requestors <> outer.accelerator.module.io.ptw
 }
+
