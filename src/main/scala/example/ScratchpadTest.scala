@@ -7,7 +7,7 @@ import freechips.rocketchip.devices.tilelink.TLTestRAM
 import freechips.rocketchip.diplomacy.{AddressSet, LazyModule, LazyModuleImp}
 import freechips.rocketchip.groundtest.DummyPTW
 import freechips.rocketchip.tile.{OpcodeSet, RoCCCommand, RoCCResponse}
-import freechips.rocketchip.tilelink.{TLFragmenter, TLXbar}
+import freechips.rocketchip.tilelink.{TLFragmenter, TLXbar, TLBuffer}
 
 class ScratchpadTest(opcodes: OpcodeSet)(implicit p: Parameters) extends LazyModule() {
   override lazy val module = new ScratchpadTestModule(this)
@@ -15,7 +15,7 @@ class ScratchpadTest(opcodes: OpcodeSet)(implicit p: Parameters) extends LazyMod
   val xbar = LazyModule(new TLXbar)
   val accelerator = LazyModule(new CompressionAccelerator(opcodes))
   xbar.node :=* accelerator.tlNode
-  ram.node := TLFragmenter(8, 64) := xbar.node
+  ram.node := TLFragmenter(8, 64) := TLBuffer() := xbar.node
 }
 
 class ScratchpadTestModule(outer: ScratchpadTest)(implicit p: Parameters) extends LazyModuleImp(outer) {
