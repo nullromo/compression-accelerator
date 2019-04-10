@@ -27,7 +27,7 @@ class CircularBuffer(length: Int, width: Int) extends Module {
   val size = RegInit(0.U(log2Ceil(length).W))
 
   when(io.write) {
-    assert(head =/= tail)
+    when(head === tail) {printf("Error: head was the same as tail!")}
     empty := false.B
     when(!empty) {
       tail := tail + 1.U
@@ -35,7 +35,7 @@ class CircularBuffer(length: Int, width: Int) extends Module {
   }
 
   when(io.read) {
-    assert(!empty)
+    when(empty) {printf("Error: cannot read from empty buffer!")}
     when(head === tail - 1.U) {
       empty := true.B
     }.otherwise {

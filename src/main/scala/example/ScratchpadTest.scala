@@ -5,10 +5,9 @@ import chisel3.util._
 import freechips.rocketchip.config.Parameters
 import freechips.rocketchip.devices.tilelink.TLTestRAM
 import freechips.rocketchip.diplomacy.{AddressSet, LazyModule, LazyModuleImp}
+import freechips.rocketchip.groundtest.DummyPTW
 import freechips.rocketchip.tile.{OpcodeSet, RoCCCommand, RoCCResponse}
 import freechips.rocketchip.tilelink.{TLFragmenter, TLXbar}
-import freechips.rocketchip.rocket.TLBPTWIO
-import freechips.rocketchip.groundtest.DummyPTW
 
 class ScratchpadTest(opcodes: OpcodeSet)(implicit p: Parameters) extends LazyModule() {
   override lazy val module = new ScratchpadTestModule(this)
@@ -26,7 +25,6 @@ class ScratchpadTestModule(outer: ScratchpadTest)(implicit p: Parameters) extend
     val busy = Output(Bool())
     val interrupt = Output(Bool())
     val exception = Input(Bool())
-    val ptw = new TLBPTWIO
   })
 
   outer.accelerator.module.io.cmd <> io.cmd
@@ -36,5 +34,5 @@ class ScratchpadTestModule(outer: ScratchpadTest)(implicit p: Parameters) extend
   outer.accelerator.module.io.exception := io.exception
 
   val ptw = Module(new DummyPTW(1))
-  ptw.io.requestors(0) <> io.ptw
+  ptw.io.requestors <> outer.accelerator.module.io.ptw
 }

@@ -192,8 +192,8 @@ class Scratchpad(
     val tlberr = Mux(req.write,
       io.tlb.resp.bits.pf.st || io.tlb.resp.bits.ae.st,
       io.tlb.resp.bits.pf.ld || io.tlb.resp.bits.ae.ld)
-    printf("pf: %d\n", io.tlb.resp.bits.pf.ld)
-    printf("ae: %d\n", io.tlb.resp.bits.ae.ld)
+//    printf("pf: %d\n", io.tlb.resp.bits.pf.ld)
+//    printf("ae: %d\n", io.tlb.resp.bits.ae.ld)
 
     val nextVaddr = Cat(reqVpn + 1.U, 0.U(pgIdxBits.W))
     val pageBytes = nextVaddr - req.vaddr
