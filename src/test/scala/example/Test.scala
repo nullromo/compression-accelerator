@@ -27,7 +27,7 @@ class CompressionAcceleratorTester(c: ScratchpadTestModule) extends PeekPokeTest
   step(1)
   poke(c.io.cmd.valid, false)
   step(100)
-//  expect(peek(c.io.interrupt) != 277, "I should have passed ;(")
+  //  expect(peek(c.io.interrupt) != 277, "I should have passed ;(")
 
 }
 
@@ -42,6 +42,25 @@ class CompressionAcceleratorSpec extends ChiselFlatSpec {
   }
 }
 
+class GenerateMemdata extends FlatSpec with Matchers {
+  "Memdata generator" should "generate data" in {
+    val randgen = new Random(15)
+    val memory_data = Array.fill[Seq[Int]](8)(Array.fill[Int]((pow(2, 10) - 1).toInt)(randgen.nextInt(256)))
+
+    for (i <- 0 until 8) {
+      val fileName = "memdata/memdata_" + i + ".txt"
+      val writer = new PrintWriter(new File(fileName))
+      for (k <- memory_data(i).indices) {
+        writer.write(memory_data(i)(k).toString)
+        if (k != memory_data(i).length - 1)
+          writer.write("\n")
+      }
+      writer.close()
+      print("finsih 1 file write!\n")
+    }
+  }
+}
+
 class TreadleTest extends FlatSpec with Matchers {
   implicit val p: Parameters = AcceleratorParams()
 
@@ -51,30 +70,15 @@ class TreadleTest extends FlatSpec with Matchers {
 
     tester.engine.makeVCDLogger("results/treadlevcd.vcd", showUnderscored = true)
 
-	val randgen = new Random(15)
-	val memory_data = Array.fill[Seq[Int]](8)(Array.fill[Int]((pow(2,10)-1).toInt)(randgen.nextInt(256)))
 
-	for(i <- 0 until 8){
-		val fileName = "memdata/memdata_" + i + ".txt"
-		val writer = new PrintWriter(new File(fileName))
-		for(k <- 0 until memory_data(i).length){
-			writer.write(memory_data(i)(k).toString)
-			if(k != memory_data(i).length-1)
-				writer.write("\n")
-		}
-		writer.close() 
-		print("finsih 1 file write!\n")
-		//val mem = "ram.mem_" + i
-		//loadMemFromFile(fileName, mem)
-	}
-
-	val mem_array = Array.ofDim[String](8)
-	mem_array.zipWithIndex.foreach{case(mem, k) => mem_array(k) = "ram.mem_" + k
-												   val fileName = "memdata/memdata_"+k+".txt"
-												   loadMemFromFile(fileName, mem_array(k))}
+    val mem_array = Array.ofDim[String](8)
+    mem_array.zipWithIndex.foreach { case (mem, k) => mem_array(k) = "ram.mem_" + k
+      val fileName = "memdata/memdata_" + k + ".txt"
+      loadMemFromFile(fileName, mem_array(k))
+    }
 
     // set up memory
-   	// val mem = "ram.mem_0"
+    // val mem = "ram.mem_0"
     // loadMemFromFile("memdata/memdata_0.txt", mem)
 
     // start compression
@@ -91,10 +95,10 @@ class TreadleTest extends FlatSpec with Matchers {
     //do testing
     var dump: Seq[BigInt] = Seq()
 
-    for(i <- 0 until 500) {
+    for (i <- 0 until 500) {
       tester.step()
       val newDump = read128Mem(mem_array(0))
-      if(dump != newDump) {
+      if (dump != newDump) {
         dump = newDump
         println("Cycle " + i)
         dump128Mem(mem_array(0))
