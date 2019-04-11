@@ -15,3 +15,4 @@ results/
 test_run_dir/
 verisim/DVEfiles/
 verisim/opendatabase.log
+memdata/
