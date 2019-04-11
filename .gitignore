@@ -10,11 +10,11 @@ target
 simv*
 *.vcd
 .DS_Store
-results/
+results/*
 !results/.gitkeep
 .idea/
 test_run_dir/
 verisim/DVEfiles/
 verisim/opendatabase.log
-memdata/
+memdata/*
 !memdata/.gitkeep
