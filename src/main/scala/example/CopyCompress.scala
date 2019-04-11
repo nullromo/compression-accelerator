@@ -21,7 +21,7 @@ class CopyCompressIO (params: CopyCompressParams) extends Bundle{
 
     val equal = Output(Bool()) // tell the processor the stream is not a copy anymore (may due to mismatch or exceed max copy length)
     val hit = Input(Bool()) // tell the datapath to start compress
-    val bufferPtrInc = Decoupled(UInt(log2Ceil(params.parallellane).W))
+    val bufferPtrInc = Decoupled(UInt((log2Ceil(params.parallellane+1)).W))
     val remain = Input(UInt(64.W)) // remaining byte number needs to be compressed
 
     override def cloneType: this.type = CopyCompressIO(params).asInstanceOf[this.type]
@@ -45,26 +45,32 @@ class CopyCompress (val params: CopyCompressParams) extends Module{
 
     val compareResult = Wire(Vec(params.parallellane, Bool()))
     val compareResult_uint = Wire(UInt((params.parallellane).W))
+    val equal_reg = Reg(Bool())
+    val equal_reg_prev = Reg(Bool())
     dontTouch(compareResult)
     dontTouch(compareResult_uint)
     dontTouch(num_candidate_valid)
     dontTouch(num_data_valid)
+    dontTouch(io.bufferPtrInc.bits)
+    dontTouch(candidate_valid)
+    dontTouch(data_valid)
 
     val reachEnd = Wire(Bool())
 
     val maxLength:Int = pow(2,6).toInt
-    print(maxLength)
-    print("\n")
-    print(pow(2,1)-1)
 
     val copyStreamFormer = Module(new CopyStreamFormer(params))
 
     compareResult_uint := compareResult.asUInt
+    equal_reg := io.equal
+    equal_reg_prev := equal_reg
 
 
     when(io.hit){
         start_reg := true.B
         lengthAccum := 0.U
+        equal_reg := true.B
+        equal_reg_prev := true.B
     }
     .elsewhen(~io.equal){ 
       start_reg := false.B
@@ -73,8 +79,8 @@ class CopyCompress (val params: CopyCompressParams) extends Module{
     (io.candidate zip candidate_valid).foreach{case(a,b) => b := a.valid.asUInt }
     (io.data zip data_valid).foreach{case(a,b) => b := a.valid.asUInt}
 
-    num_candidate_valid := candidate_valid.reduce(_+_)
-    num_data_valid := data_valid.reduce(_+_)
+    num_candidate_valid := candidate_valid.reduce(_+&_)
+    num_data_valid := data_valid.reduce(_+&_)
 
     // ******** Do comparison ***************
     for(i <- 0 until params.parallellane){
@@ -96,27 +102,24 @@ class CopyCompress (val params: CopyCompressParams) extends Module{
     
     when(start_reg & copyStreamFormer.io.start.ready){
 
-        io.bufferPtrInc.bits := 1.U // default value
+        io.bufferPtrInc.bits := 0.U // default value
         io.bufferPtrInc.valid := false.B
 
         // calculating how many same bytes between input data and candidate buffer
         // Because candidate should always in front of data, if # candidate < # data, candidate buffer is empty and needs to be fetched
         // But fetch data should always have priority
         // However, if # data is 0 and remain is 0, the compression is reach the end
+        // It has problem here !!!!!!
         when(num_candidate_valid >= num_data_valid && ~reachEnd){
             for(i <- 0 until params.parallellane){
-                when(compareResult_uint >= ((pow(2,i+1) - 1).toInt).U ){
+              when((compareResult.asUInt & ((pow(2,i+1) - 1).toInt).U) === ((pow(2,i+1) - 1).toInt).U ){
                     when(lengthAccum < maxLength.U  && ((lengthAccum + i.U) <= maxLength.U)){ // 6-bits represents 1-64 same bytes not 0-63
                         io.bufferPtrInc.bits := (i+1).U
                     }
                 }
             }
-            when(lengthAccum === 0.U){
-                lengthAccum := lengthAccum + io.bufferPtrInc.bits -1.U
-            }
-            .otherwise{
-                lengthAccum := lengthAccum + io.bufferPtrInc.bits
-            }
+            
+            lengthAccum := lengthAccum + io.bufferPtrInc.bits
             io.bufferPtrInc.valid := true.B
             when(io.bufferPtrInc.bits === num_data_valid){
                 io.equal := true.B
@@ -126,15 +129,15 @@ class CopyCompress (val params: CopyCompressParams) extends Module{
             }
         }
         .elsewhen(num_candidate_valid < num_data_valid && ~reachEnd){
-            io.equal := true.B // remain same status
+            io.equal := equal_reg//true.B // remain same status
         }
         .otherwise{
             io.equal := false.B
         }
     }
     .elsewhen(start_reg){
-        io.equal := true.B
-        io.bufferPtrInc.bits := 1.U // default value
+        io.equal := equal_reg//true.B
+        io.bufferPtrInc.bits := 0.U // default value
         io.bufferPtrInc.valid := true.B
     }
     .otherwise{
@@ -153,7 +156,7 @@ class CopyCompress (val params: CopyCompressParams) extends Module{
 
     copyStreamFormer.io.lengthAccum := lengthAccum
 
-    copyStreamFormer.io.start.bits := start_reg & (~io.equal)
+    copyStreamFormer.io.start.bits := equal_reg_prev && (~equal_reg)//start_reg & (~io.equal)
     copyStreamFormer.io.start.valid := true.B
 
     io.copyCompressed_one.bits := copyStreamFormer.io.copyCompressed_one.bits
@@ -216,17 +219,17 @@ class CopyStreamFormer (params: CopyCompressParams) extends Module{
         io.copyCompressed_four.bits := 0.U
 
         // hope it is little endian format
-        when((copyOffset < (pow(2,11).toInt).U) && ((length+1.U) >= 4.U) && ((length+1.U) <= 11.U)){
+        when((copyOffset < (pow(2,11).toInt).U) && ((length) >= 4.U) && ((length) <= 11.U)){
             io.copyCompressed_one.valid := true.B
-            io.copyCompressed_one.bits := (copyOffset & (0xFF).U) + (1.U << 8) + ((length - 4.U) << 10) + ((copyOffset & (0x700).U) << 5)
+            io.copyCompressed_one.bits := (copyOffset & (0xFF).U) | (1.U << 8) | ((length - 4.U) << 10) | ((copyOffset & (0x700).U) << 5)
         }
         .elsewhen(copyOffset < (pow(2,16).toInt).U){
             io.copyCompressed_two.valid := true.B
-            io.copyCompressed_two.bits := ((copyOffset & (0xFF00).U) >> 8) + ((copyOffset & (0x00FF).U) << 8) + (2.U << 16) + length << 18
+            io.copyCompressed_two.bits := ((copyOffset & (0xFF00).U) >> 8) | ((copyOffset & (0x00FF).U) << 8) | (2.U << 16) | ((length-1.U) << 18)
         }
         .otherwise{
             io.copyCompressed_four.valid := true.B
-            io.copyCompressed_four.bits := ((copyOffset & (0xFF000000L).U) >> 24) + ((copyOffset & (0x00FF0000L).U) >> 8) + ((copyOffset & (0x0000FF00L).U) << 8) + ((copyOffset & (0x000000FFL).U) << 24) + (3.U << 32) + length << 34
+            io.copyCompressed_four.bits := ((copyOffset & (0xFF000000L).U) >> 24) | ((copyOffset & (0x00FF0000L).U) >> 8) | ((copyOffset & (0x0000FF00L).U) << 8) | ((copyOffset & (0x000000FFL).U) << 24) | (3.U << 32) | ((length-1.U) << 34)
         }
 
         when(io.copyCompressed_one.ready){
