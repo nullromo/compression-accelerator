@@ -101,13 +101,13 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 
 
 
-  val matchFinder = Module(new MatchFinder(params.scratchpadWidth, 32, params.hashTableSize))
-  matchFinder.io.start := startLooking
-  matchFinder.io.basePointer := basePointer
-  matchFinder.io.newCandidateData := fakeScratchpad.read(matchFinder.io.memoryReadAddress)
-   := matchFinder.io.matchFound
-   := matchFinder.io.matchBegin
-   := matchFinder.io.matchEnd
+//  val matchFinder = Module(new MatchFinder(params.scratchpadWidth, 32, params.hashTableSize))
+//  matchFinder.io.start := startLooking
+//  matchFinder.io.basePointer := basePointer
+//  matchFinder.io.newCandidateData := fakeScratchpad.read(matchFinder.io.memoryReadAddress)
+//   := matchFinder.io.matchFound
+//   := matchFinder.io.matchBegin
+//   := matchFinder.io.matchEnd
 
 
 
@@ -183,81 +183,6 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   io.resp.bits.rd := RegNext(io.resp.bits.rd)
   io.resp.bits.data := (-1).S(xLen.W).asUInt()
   io.interrupt := false.B
-}
-
-class MatchFinderInput(dataWidth: Int, addressWidth: Int) extends Bundle {
-  val basePointer = Input(UInt(addressWidth.W))
-  val newCandidateData = Input(UInt(dataWidth.W))
-
-  override def cloneType: this.type = new MatchFinderInput(dataWidth, addressWidth).asInstanceOf[this.type]
-}
-
-class MatchFinderOutput(addressWidth: Int) extends Bundle {
-  val memoryReadAddress = Output(UInt(addressWidth.W))
-  val matchBegin = Output(UInt(addressWidth.W))
-  val matchEnd = Output(UInt(addressWidth.W))
-
-  override def cloneType: this.type = new MatchFinderOutput(addressWidth).asInstanceOf[this.type]
-}
-
-class MatchFinderIO(dataWidth: Int, addressWidth: Int) extends Bundle {
-  val in = Flipped(Decoupled(new MatchFinderInput(dataWidth, addressWidth)))
-  val out = Decoupled(new MatchFinderOutput(addressWidth))
-
-  override def cloneType: this.type = new MatchFinderIO(dataWidth, addressWidth).asInstanceOf[this.type]
-}
-
-class MatchFinder(dataWidth: Int, addressWidth: Int, hashTableSize: Int) extends Module {
-  val io = IO(new MatchFinderIO(dataWidth, addressWidth))
-
-  // true when looking for a match
-  val looking = RegInit(false.B)
-
-  // pointers given at the start of the search
-  val basePointer = RegInit(0.U(addressWidth.W))
-  val matchPointer = RegInit(0.U(addressWidth.W))
-
-  //TODO: add skip and bbhl for optimization
-
-  // when start looking, save the base pointer and set the state to looking
-  when(io.in.fire() && !looking) {
-    looking := true.B
-    basePointer := io.in.bits.basePointer
-    matchPointer := io.in.bits.basePointer + 1.U
-  }
-
-  // true when a match has been found
-  val matchFound: Bool = Wire(Bool())
-  matchFound := hashTable.io.oldData === io.in.bits.newCandidateData
-
-  // when the output is accepted, we are done with the looking state and ready to start again
-  when(io.out.fire() && looking) {
-    looking := false.B
-  }
-
-  // ready to accept more input and start again when we are no longer looking
-  io.in.ready := !looking
-
-  // we have valid output when we are still in the looking state and there is a match
-  io.out.valid := looking && matchFound
-
-  // create the hash table
-  val hashTable = Module(new HashTable(32, 16, hashTableSize))
-
-  // update the hash table with the new data and the offset of the new data
-  hashTable.io.newData := io.in.bits.newCandidateData
-  hashTable.io.newOffset := matchPointer - basePointer
-
-  // the beginning of the found match is the old offset for this data (the last location that held the same data)
-  io.out.bits.matchBegin := hashTable.io.oldOffset
-
-  // only write to the hash table while we are looking for a match //TODO this may be wrong
-  hashTable.io.enable := looking
-
-  // advance the searching pointer while looking for a match
-  when(looking) {
-    matchPointer := matchPointer + 1.U
-  }
 }
 
 object DMAUtils {
