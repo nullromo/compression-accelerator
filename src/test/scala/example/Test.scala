@@ -22,8 +22,8 @@ class CompressionAcceleratorTester(c: ScratchpadTestModule) extends PeekPokeTest
   step(1)
   // compress
   poke(c.io.cmd.bits.inst.funct, 0) // doCompress
-  poke(c.io.cmd.bits.rs1, 0x1000) // src = 0
-  poke(c.io.cmd.bits.rs2, 0x2000) // dst = 100
+  poke(c.io.cmd.bits.rs1, 0x0000) // src = 0
+  poke(c.io.cmd.bits.rs2, 0x1000) // dst = 4096
   step(1)
   poke(c.io.cmd.valid, false)
   step(100)

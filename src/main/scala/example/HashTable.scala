@@ -1,7 +1,8 @@
 package example
 
-import chisel3.util.log2Floor
 import chisel3._
+import chisel3.core.dontTouch
+import chisel3.util.log2Floor
 
 /**
   * Hash Table for compression. Takes in the new data at a given location and the offset of the new data from the base,
@@ -18,6 +19,7 @@ class HashTable(dataWidth: Int, offsetWidth: Int, hashTableSize: Int) extends Mo
 
   // hash the new data to get the table address
   val address: UInt = hash(io.newData, (32 - log2Floor(hashTableSize)).U)
+  dontTouch(address)
 
   // create the underlying memories that hold the 2 columns of the table
   val offsetMem = Mem(hashTableSize, UInt(offsetWidth.W))
@@ -35,6 +37,6 @@ class HashTable(dataWidth: Int, offsetWidth: Int, hashTableSize: Int) extends Mo
 
   // hash function
   def hash(bytes: UInt, shift: UInt): UInt = {
-    (bytes * 0x1e35a7bd.U >> shift).asUInt()
+    (bytes * 0x1e35a7bd.U >> shift).asUInt()(log2Floor(hashTableSize) - 1, 0)
   }
 }
