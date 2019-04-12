@@ -120,8 +120,16 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   val matchFound: Bool = Wire(Bool())
   matchFound := oldCandidateData === newCandidateData
 
-
-
+  // ----- TEST ScratchPad Settings ----------
+  val writeScratchPadCounter = RegInit(100.U(8.W))
+  val teststate = RegInit(0.U(3.W))
+  val sInit_test = 0.U
+  val sWriteScratchPad_test = 1.U
+  val sWriteMem_test = 2.U
+  val sReadMemReverse_test = 3.U
+  val sReadScratchPad_test = 4.U
+  val sDone_test = 5.U
+  val scratchpadPtr = RegInit(0.U(32.W))
 
   prev_ip := ip
   skip := skip + bbhl
@@ -147,7 +155,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 
   scratchpadIO.dma.resp.ready := true.B
   // when the scratchpad is not full, make a dma request
-  when(!scratchpadBufferController.io.full && busy && scratchpadIO.dma.req.ready){
+  /*when(!scratchpadBufferController.io.full && busy && scratchpadIO.dma.req.ready){
     //TODO: make sure there are no bugs where we overwrite something (keep the min and max pointers in line)
     scratchpadIO.dma.req.bits := DMAUtils.makeDMARequest(write = false.B, maxScratchpadAddress, scratchpadBufferController.io.tail)(p, params)
 	scratchpadIO.dma.req.valid := true.B
@@ -170,7 +178,97 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   // Testing whether Scratchpad fills in or not
   scratchpadIO.read.foreach{(a) => a(0).en := busy}
   scratchpadIO.read.foreach{(a) => a(0).addr := Mux(maxScratchpadAddress > 0.U, (maxScratchpadAddress-8.U) >> 3, 0.U)}	
-  printf("data is: %d\n", scratchpadIO.read(0)(0).data)
+  printf("data is: %d\n", scratchpadIO.read(0)(0).data)*/
+
+
+  	// ------ TEST ScrathPad ------------------------
+	scratchpadIO.write.foreach{(a) => a.en := teststate === sWriteScratchPad_test}
+	scratchpadIO.write.foreach{(a) => a.addr := scratchpadPtr >> 3}
+	scratchpadIO.write.foreach{(a) => a.data := scratchpadPtr}
+
+	scratchpadIO.read.foreach{(a) => a(0).en := teststate === sReadScratchPad_test}
+	scratchpadIO.read.foreach{(a) => a(0).addr := Mux(scratchpadPtr > 0.U, (scratchpadPtr-8.U) >> 3, 0.U)}
+	
+
+    scratchpadIO.dma.req.bits := DMAUtils.makeDMARequest(write = (teststate === sWriteMem_test), maxScratchpadAddress, scratchpadPtr >> 3)(p, params)
+	scratchpadIO.dma.req.valid := ((teststate === sWriteMem_test || teststate === sReadMemReverse_test) && scratchpadIO.dma.req.ready)
+
+    when(teststate === sInit_test){
+		when(busy){
+			teststate := sWriteScratchPad_test
+		}	
+	}
+	.elsewhen(teststate === sWriteScratchPad_test){
+		when(writeScratchPadCounter > 0.U){
+			scratchpadPtr := scratchpadPtr + 8.U
+			writeScratchPadCounter := writeScratchPadCounter - 1.U
+		}
+		.otherwise{
+			teststate := sWriteMem_test
+			writeScratchPadCounter := 100.U
+			scratchpadPtr := 0.U
+		}
+	}
+	.elsewhen(teststate === sWriteMem_test){
+		when(writeScratchPadCounter > 0.U){
+			when(scratchpadIO.dma.resp.valid){
+				when(scratchpadIO.dma.resp.bits.error) {
+			  		printf("DMA returned write error=true in a response (page fault?)\n") //TODO: figure out how to handle the error
+				}.otherwise {
+			  		maxScratchpadAddress := maxScratchpadAddress + 8.U
+					scratchpadPtr := scratchpadPtr + 8.U
+   				}
+				writeScratchPadCounter := writeScratchPadCounter - 1.U
+			}
+		}
+		.otherwise{
+			when(scratchpadIO.dma.resp.valid){
+				when(scratchpadIO.dma.resp.bits.error) {
+			  		printf("DMA returned write error=true in a response (page fault?)\n") //TODO: figure out how to handle the error
+				}.otherwise {
+					scratchpadPtr := 0.U
+   				}
+				writeScratchPadCounter := 100.U
+				teststate := sReadMemReverse_test
+			}
+		}
+	}
+	.elsewhen(teststate === sReadMemReverse_test){
+		when(writeScratchPadCounter > 0.U){
+			when(scratchpadIO.dma.resp.valid){
+				when(scratchpadIO.dma.resp.bits.error) {
+			  		printf("DMA returned read error=true in a response (page fault?)\n") //TODO: figure out how to handle the error
+				}.otherwise {
+			  		maxScratchpadAddress := maxScratchpadAddress - 8.U
+					scratchpadPtr := scratchpadPtr + 8.U
+   				}
+				writeScratchPadCounter := writeScratchPadCounter - 1.U
+			}
+		}
+		.otherwise{
+			when(scratchpadIO.dma.resp.valid){
+				when(scratchpadIO.dma.resp.bits.error) {
+			  		printf("DMA returned read error=true in a response (page fault?)\n") //TODO: figure out how to handle the error
+				}.otherwise {
+					scratchpadPtr := 0.U
+   				}
+				writeScratchPadCounter := 100.U
+				teststate := sReadScratchPad_test
+			}
+		}
+	}
+	.elsewhen(teststate === sReadScratchPad_test){
+		when(writeScratchPadCounter > 0.U){
+			scratchpadPtr := scratchpadPtr + 8.U
+			writeScratchPadCounter := writeScratchPadCounter - 1.U
+		}
+		.otherwise{
+			teststate := sDone_test
+			writeScratchPadCounter := 100.U
+			scratchpadPtr := 0.U
+		}
+		printf("data is: %d\n", scratchpadIO.read(0)(0).data)
+	}
 	
   // initialize each operation
   when(cmd.fire()) {
