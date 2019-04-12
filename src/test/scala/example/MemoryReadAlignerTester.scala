@@ -2,7 +2,20 @@ package example
 
 import chisel3.iotesters.{ChiselFlatSpec, Driver, PeekPokeTester}
 
+import scala.io.Source
+
 class MemoryReadAlignerTester(c: MemoryReadAlignerTestModule, sequential: Boolean) extends PeekPokeTester(c) {
+  // load the memory data for comparison
+  val memMap = Array.fill(800){""}
+  var lineNum = 0
+  for (line <- Source.fromFile("data/alignerTestData.txt").getLines()) {
+    for(i <- 0 until 8) {
+      val data1 = Integer.parseInt(line.substring(2*i, 2*i + 2), 16)
+      memMap(8*lineNum + i) = format(data1, 1)
+    }
+    lineNum += 1
+  }
+
   // keep track of test cycles
   var cycles = 0
 
@@ -21,7 +34,11 @@ class MemoryReadAlignerTester(c: MemoryReadAlignerTestModule, sequential: Boolea
     // read when the data is valid
     if (peek(c.io.readIO.data.valid) != 0 && cycles < 1000) {
       val dataOut = peek(c.io.readIO.data.bits)
-      println("mem[" + address + "] = " + format(dataOut, 4))
+      val dataString = format(dataOut, 4)
+      val expectedDataString = memMap(address) + memMap(address + 1) + memMap(address + 2) + memMap(address + 3)
+      println("mem[" + f"$address%2d" + "] = " + dataString)
+      println("was       " + expectedDataString)
+      expect(dataString == expectedDataString, "wrong data :(")
     }
 
     // increment the address if ready to

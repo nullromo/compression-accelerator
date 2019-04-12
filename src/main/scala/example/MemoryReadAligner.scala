@@ -122,7 +122,7 @@ class MemoryReadAlignerTestModule(readAddressWidth: Int, readDataWidth: Int, mem
   val aligner = Module(new MemoryReadAligner(readAddressWidth, readDataWidth, memAddressWidth, memDataWidth))
   dontTouch(aligner.io)
   val backingMem = Mem(Math.pow(2, memAddressWidth).toInt, UInt(memDataWidth.W))
-  loadMemoryFromFile(backingMem, "memdata/alignerTestData.txt")
+  loadMemoryFromFile(backingMem, "data/alignerTestData.txt")
 
   // connect the memory to the aligner
   aligner.io.memIO.data := backingMem.read(aligner.io.memIO.address)
