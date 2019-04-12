@@ -131,7 +131,6 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 
 
 
-
   /*
   // when the scratchpad is not full, make a dma request
   when(!scratchpadBufferController.io.full && scratchpadIO.dma.req.ready){
