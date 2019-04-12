@@ -49,30 +49,48 @@ class MemoryReadAligner(readAddressWidth: Int, readDataWidth: Int, memAddressWid
   )
   val bytesInUpperRead: UInt = readBytes.U - bytesInLowerRead
 
-  // select the correct read data
-  val aggregateReadData: Vec[UInt] = Cat(cachedData, io.memIO.data).asTypeOf(Vec(memBytes*2, UInt(8.W)))
-
-  // concatenate the appropriate bytes from the lower and upper read data into the final output
-  //  io.readIO.data.bits := Cat(
-  //    aggregateReadData(lowerReadOffset, lowerReadOffset + bytesInLowerRead),
-  //    upperReadData(0.U, bytesInUpperRead)
-  //  )
-  //TODO: do this the correct, parameterized way
-  io.readIO.data.bits := Cat(
-    aggregateReadData((memBytes*2).U - lowerReadOffset - 1.U),
-    aggregateReadData((memBytes*2).U - lowerReadOffset - 2.U),
-    aggregateReadData((memBytes*2).U - lowerReadOffset - 3.U),
-    aggregateReadData((memBytes*2).U - lowerReadOffset - 4.U),
-  )
-
   // the cached data is the correct data if the cached address matches the address we want
   val cachedDataValid: Bool = lowerReadAddress === cachedAddress && initialized
 
+  // when we are loading up the new data to cache, there is one cycle where we have invalid output but
+  // the data is there. This bypass allows us to operate at 100% throughput
+  val bypass = WireInit(false.B)
+  bypass := false.B
+
+  // concatenate the appropriate bytes from the lower and upper read data into the final output
+  val aggregateReadData: Vec[UInt] = Wire(Vec(memBytes * 2, UInt(8.W)))
+  when(!cachedDataValid && bytesInUpperRead === 0.U) {
+    bypass := true.B
+    aggregateReadData := Cat(io.memIO.data, io.memIO.data).asTypeOf(Vec(memBytes * 2, UInt(8.W)))
+  }.otherwise {
+    aggregateReadData := Cat(cachedData, io.memIO.data).asTypeOf(Vec(memBytes * 2, UInt(8.W)))
+  }
+
+
+
+  //TODO: do this the correct, parameterized way
+
+//  for (i <- 0 until readBytes) {
+//    io.readIO.data.bits := Cat(io.readIO.data.bits,
+//      aggregateReadData((memBytes * 2).U - lowerReadOffset - (1 + i).U)
+//    )
+//  }
+
+
+  io.readIO.data.bits := Cat(
+    aggregateReadData((memBytes * 2).U - lowerReadOffset - 1.U),
+    aggregateReadData((memBytes * 2).U - lowerReadOffset - 2.U),
+    aggregateReadData((memBytes * 2).U - lowerReadOffset - 3.U),
+    aggregateReadData((memBytes * 2).U - lowerReadOffset - 4.U),
+  )
+
+
+
   // the read data output of this module is only valid if the cached data was valid
-  io.readIO.data.valid := cachedDataValid
+  io.readIO.data.valid := cachedDataValid || bypass
 
   // we can always output the correct data and accept the next address when the cached data is valid
-  io.readIO.address.ready := cachedDataValid
+  io.readIO.address.ready := cachedDataValid || bypass
 
   // when the cached data is correct (the lower read data), then we can read the upper data
   // otherwise, we will have to read the lower data first
@@ -98,6 +116,7 @@ class MemoryReadAligner(readAddressWidth: Int, readDataWidth: Int, memAddressWid
   dontTouch(bytesInLowerRead)
   dontTouch(bytesInUpperRead)
   dontTouch(cachedDataValid)
+  dontTouch(bypass)
 }
 
 class MemoryReadAlignerTestModule(readAddressWidth: Int, readDataWidth: Int, memAddressWidth: Int, memDataWidth: Int) extends Module {

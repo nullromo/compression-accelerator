@@ -61,7 +61,7 @@ class MemoryReadAlignerSpec extends ChiselFlatSpec {
   }
 
   "MemoryReadAligner" should "not mess up when the reads aren't sequential" in {
-    Driver.execute(TesterArgs() :+ "MemoryReadAligner", dutGen) {
+    Driver.execute(TesterArgs() :+ "MemoryReadAlignerNonsequential", dutGen) {
       c => new MemoryReadAlignerTester(c, false)
     } should be(true)
   }
