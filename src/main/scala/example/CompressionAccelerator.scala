@@ -145,6 +145,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   scratchpadBufferController.io.write := false.B
   //scratchpadIO.dma.req.noenq()
 
+  scratchpadIO.dma.resp.ready := true.B
   // when the scratchpad is not full, make a dma request
   when(!scratchpadBufferController.io.full && busy && scratchpadIO.dma.req.ready){
     //TODO: make sure there are no bugs where we overwrite something (keep the min and max pointers in line)
@@ -166,9 +167,11 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   }
 
 
-
-
-
+  // Testing whether Scratchpad fills in or not
+  scratchpadIO.read.foreach{(a) => a(0).en := busy}
+  scratchpadIO.read.foreach{(a) => a(0).addr := Mux(maxScratchpadAddress > 0.U, (maxScratchpadAddress-8.U) >> 3, 0.U)}	
+  printf("data is: %d\n", scratchpadIO.read(0)(0).data)
+	
   // initialize each operation
   when(cmd.fire()) {
     when(doSetLength) {

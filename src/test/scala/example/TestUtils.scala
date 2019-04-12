@@ -12,11 +12,13 @@ import scala.io.Source
 object TesterArgs {
   def apply() = {
     Array(
+	  "-tbn",
+	  "verilator",
       "-fiwv",
-      "--backend-name", "treadle",
-      "--tr-write-vcd",
-      "--target-dir", "results",
-      "--top-name")
+      //"--backend-name", "treadle",
+      //"--tr-write-vcd",
+      //"--target-dir", "results",
+      /*"--top-name"*/)
   }
 }
 

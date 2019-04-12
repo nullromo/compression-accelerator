@@ -8,6 +8,7 @@ import freechips.rocketchip.diplomacy.{AddressSet, LazyModule, LazyModuleImp}
 import freechips.rocketchip.groundtest.DummyPTW
 import freechips.rocketchip.tile.{OpcodeSet, RoCCCommand, RoCCResponse}
 import freechips.rocketchip.tilelink.{TLFragmenter, TLXbar, TLBuffer}
+import chisel3.util.experimental.loadMemoryFromFile
 
 class ScratchpadTest(opcodes: OpcodeSet)(implicit p: Parameters) extends LazyModule() {
   override lazy val module = new ScratchpadTestModule(this)
@@ -32,6 +33,7 @@ class ScratchpadTestModule(outer: ScratchpadTest)(implicit p: Parameters) extend
   io.busy := outer.accelerator.module.io.busy
   io.interrupt := outer.accelerator.module.io.interrupt
   outer.accelerator.module.io.exception := io.exception
+  loadMemoryFromFile(outer.ram.module.mem, "memdata/memdata.hex.txt")
 
   val ptw = Module(new DummyPTW(1))
   ptw.io.requestors <> outer.accelerator.module.io.ptw

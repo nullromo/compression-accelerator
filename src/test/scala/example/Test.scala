@@ -15,19 +15,42 @@ import java.io.PrintWriter
 
 
 class CompressionAcceleratorTester(c: ScratchpadTestModule) extends PeekPokeTester(c) {
-  // set length
-  poke(c.io.cmd.bits.inst.funct, 2) // doSetLength
-  poke(c.io.cmd.bits.rs1, 100) // length = 100
-  poke(c.io.cmd.valid, true) // fire
-  step(1)
-  // compress
-  poke(c.io.cmd.bits.inst.funct, 0) // doCompress
-  poke(c.io.cmd.bits.rs1, 0x1000) // src = 0
-  poke(c.io.cmd.bits.rs2, 0x2000) // dst = 100
-  step(1)
-  poke(c.io.cmd.valid, false)
-  step(100)
-//  expect(peek(c.io.interrupt) != 277, "I should have passed ;(")
+	val randgen = new Random(15)
+	val memory_data = Array.fill[Seq[Int]](8)(Array.fill[Int]((pow(2,10)-1).toInt)(randgen.nextInt(256)))
+
+	for(i <- 0 until 8){
+		val fileName = "memdata/memdata.hex_" + i + ".txt"
+		val writer = new PrintWriter(new File(fileName))
+		for(k <- 0 until memory_data(i).length){
+			writer.write(memory_data(i)(k).toHexString)
+			if(k != memory_data(i).length-1)
+				writer.write("\n")
+		}
+		writer.close() 
+		print("finsih 1 file write!\n")
+		//val mem = "ram.mem_" + i
+		//loadMemFromFile(fileName, mem)
+	}
+	//val mem = "ram.mem_" + i
+	//loadMemFromFile(fileName, mem)
+	//val mem_array = Array.ofDim[String](8)
+	/*mem_array.zipWithIndex.foreach{case(mem, k) => mem_array(k) = "ram.mem_" + k
+												   val fileName = "memdata/memdata_"+k+".txt"
+												   loadMemFromFile(fileName, mem_array(k))}*/
+  
+	// set length
+    poke(c.io.cmd.bits.inst.funct, 2) // doSetLength
+    poke(c.io.cmd.bits.rs1, 100) // length = 100
+    poke(c.io.cmd.valid, true) // fire
+    step(1)
+    // compress
+    poke(c.io.cmd.bits.inst.funct, 0) // doCompress
+    poke(c.io.cmd.bits.rs1, 0x0000) // src = 0
+    poke(c.io.cmd.bits.rs2, 0x2000) // dst = 100
+    step(1)
+    poke(c.io.cmd.valid, false)
+    step(1000)
+	//  expect(peek(c.io.interrupt) != 277, "I should have passed ;(")
 
 }
 
@@ -36,7 +59,7 @@ class CompressionAcceleratorSpec extends ChiselFlatSpec {
 
   val dutGen: () => ScratchpadTestModule = () => LazyModule(new ScratchpadTest(OpcodeSet.custom3)).module
   "CompressionAccelerator" should "accept commands" in {
-    Driver.execute(TesterArgs() :+ "CompressionAccelerator", dutGen) {
+    Driver.execute(TesterArgs()/* :+ "CompressionAccelerator"*/, dutGen) {
       c => new CompressionAcceleratorTester(c)
     } should be(true)
   }
