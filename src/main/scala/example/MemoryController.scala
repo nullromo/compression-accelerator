@@ -5,6 +5,7 @@ import chisel3.core.dontTouch
 import chisel3.util._
 import chisel3.util.log2Ceil
 import external.{Scratchpad, ScratchpadMemIO}
+import freechips.rocketchip.tile._
 import freechips.rocketchip.config.Parameters
 import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImp}
 import freechips.rocketchip.rocket._
@@ -42,7 +43,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
 
     // Real implementation
     lazy val module = new LazyModuleImp(this) with HasCoreParameters {
-        io = IO(new MemoryControllerIO(nRows, dataBytes))
+        val io = IO(new MemoryControllerIO(nRows, dataBytes))
     
 
         // load head/tail ptrs
@@ -72,7 +73,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
         val outOfRange = Wire(Bool())
 
         endLoad := (maxLDvAddr >= (io.readBaseAddr + io.length))
-        outOfRange := (dataPtr === (tailLDp * dataBytes.U - 1.U))
+        outOfRange := (io.dataPtr.bits === (tailLDp * dataBytes.U - 1.U))
 
         // full logic
         fullLD := ~(headLDp === tailLDp)
@@ -89,10 +90,10 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
         // -- DMA will send request when stateDMA is at s_dma_read or s_dma_write
         // -- When loading data, virtual address should be maxLDvAddr, spaddress should be tail ptr, and bank is 0
         // -- When writing data, virtual address should be maxSWvAddr, spaddress should be tail ptr, and bank is 1
-        io.dma.req.vaddr := Mux(stateDMA === s_dma_read, maxLDvAddr, maxSWvAddr)
-        io.dma.req.spaddr := Mux(stateDMA === s_dma_read, tailLDp, tailSWp)
-        io.dma.req.spbank := Mux(stateDMA === s_dma_read, 0.U, 1.U)
-        io.dma.req.write := stateDMA === s_dma_write
+        io.dma.req.bits.vaddr := Mux(stateDMA === s_dma_read, maxLDvAddr, maxSWvAddr)
+        io.dma.req.bits.spaddr := Mux(stateDMA === s_dma_read, tailLDp, tailSWp)
+        io.dma.req.bits.spbank := Mux(stateDMA === s_dma_read, 0.U, 1.U)
+        io.dma.req.bits.write := stateDMA === s_dma_write
         io.dma.req.valid := ((stateDMA === s_dma_read) || (stateDMA === s_dma_write))
 
         // connect the rest of the output
@@ -110,12 +111,12 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
         }
         .elsewhen(stateWork === s_fill){
             when(io.dma.resp.valid){
-                when(io.dma.resp.error){
+                when(io.dma.resp.bits.error){
                     printf("DMA returned filling read error=true in a response (page fault?)\n")
                 }
                 .otherwise{
                     when(emptyLD){
-                        emptyLD = false.B
+                        emptyLD := false.B
                     }
                     .otherwise{
                         tailLDp := tailLDp + 1.U
@@ -136,7 +137,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
 
             // waiting for dma response
             when(io.dma.resp.valid){
-                when(io.dma.resp.error){
+                when(io.dma.resp.bits.error){
                     printf("DMA returned working read error=true in a response (page fault?)\n")
                 }
                 .otherwise{
@@ -151,14 +152,14 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
             //       -- update minLDvAddr
             // case 4: when doing copy compression, head will change with candidatePtr
             when(io.matchFound || io.equal){
-                headLDp := io.candidatePtr >> log2Ceil(dataBytes) // get the line number
-                minLDvAddr := minLDvAddr + Mux(headLDp <= (io.candidatePtr >> log2Ceil), ((io.candidatePtr >> log2Ceil) - headLDp)*dataBytes, ((io.candidatePtr >> log2Ceil) - headLDp + nRows.U)*dataBytes)
+                headLDp := io.candidatePtr.bits >> log2Ceil(dataBytes) // get the line number
+                minLDvAddr := minLDvAddr + Mux(headLDp <= (io.candidatePtr.bits >> log2Ceil(dataBytes)), ((io.candidatePtr.bits >> log2Ceil(dataBytes)) - headLDp)*dataBytes.U, ((io.candidatePtr.bits >> log2Ceil(dataBytes)) - headLDp + nRows.U)*dataBytes.U)
             }
 
             // case 2: when no match found but load scratchpad is full and dataPtr reaches the end of the scratchpad
             //        -- move head first and then tail together
             //        -- request DMA
-            when((dataPtr === (tailLDp * dataBytes.U - 1.U)) && fullLD){
+            when((io.dataPtr.bits  === (tailLDp * dataBytes.U - 1.U)) && fullLD){
                 headLDp := headLDp + 1.U
                 minLDvAddr := minLDvAddr + dataBytes.U
             }
@@ -170,12 +171,12 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
         }
         .elsewhen(stateWork === s_write){
             when(io.dma.resp.valid){
-                when(io.dma.resp.error){
+                when(io.dma.resp.bits.error){
                     printf("DMA returned Out-of-range read error=true in a response (page fault?)\n")
                 }
                 .otherwise{
                     when((headSWp === tailSWp) && ~emptySW){
-                        emptySW = true.B
+                        emptySW := true.B
                     }.otherwise{
                         headLDp := headLDp + 1.U
                     }
