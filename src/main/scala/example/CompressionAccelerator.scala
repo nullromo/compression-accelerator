@@ -37,7 +37,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   import outer.scratchpad
   import outer.memoryctrl
   val scratchpadIO = scratchpad.module.io
-  val memoryctrlIO = memoryctrl.module.io
+  val memoryctrlIO: MemoryControllerIO = memoryctrl.module.io
 
   // connect the scratchpad to the L2 cache
   implicit val edge: TLEdgeOut = outer.tlNode.edges.out.head
@@ -84,16 +84,15 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   val scratchpadPtr = RegInit(0.U(32.W))*/
 
   // ------ TEST memory controller -----------
-  val (s_idle :: s_fill :: s_nomatch :: s_write :: s_match ::
-       s_stop_wait :: s_done :: Nil) = Enum(7)
+  val s_idle :: s_fill :: s_nomatch :: s_write :: s_match :: s_stop_wait :: s_done :: Nil = Enum(7)
   val teststate = RegInit(s_idle)
   val dataPtr = RegInit(0.U(log2Ceil(params.scratchpadEntries*8).W))
   val candidatePtr = RegInit(0.U(log2Ceil(params.scratchpadEntries*8).W))
-  val equal = Wire(Bool())
+  val equal: Bool = Wire(Bool())
   val endEncode = RegInit(false.B)
-  val storeData_bits = RegInit(0.U((params.scratchpadWidth).W))
+  val storeData_bits = RegInit(0.U(params.scratchpadWidth.W))
   val storeData_valid = RegInit(false.B)
-  val storeData_ready = Wire(Bool())
+  val storeData_ready: Bool = Wire(Bool())
 
 
   // -----------------------------------------
@@ -184,9 +183,9 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   */
 
   // Testing whether Scratchpad fills in or not
-  scratchpadIO.read.foreach{(a) => a(0).en := busy}
-  scratchpadIO.read.foreach{(a) => a(0).addr := Mux(maxScratchpadAddress > 0.U, (maxScratchpadAddress-8.U) >> 3, 0.U)}	
-  printf("data is: %d\n", scratchpadIO.read(0)(0).data)*/
+  scratchpadIO.read.foreach{a => a(0).en := busy}
+  scratchpadIO.read.foreach{a => a(0).addr := Mux(maxScratchpadAddress > 0.U, (maxScratchpadAddress-8.U) >> 3, 0.U)}
+  printf("data is: %d\n", scratchpadIO.read(0)(0).data)
 
 
   	// ------ TEST ScrathPad ------------------------

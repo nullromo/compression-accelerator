@@ -1,14 +1,12 @@
 package example
 
 import chisel3._
-import chisel3.core.dontTouch
 import chisel3.util._
 import chisel3.util.log2Ceil
-import external.{Scratchpad, ScratchpadMemIO}
+import external.ScratchpadMemIO
 import freechips.rocketchip.tile._
 import freechips.rocketchip.config.Parameters
 import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImp}
-import freechips.rocketchip.rocket._
 
 class MemoryControllerIO(val nRows: Int, val dataBytes: Int)(implicit p: Parameters) extends CoreBundle {
     // --Inputs
@@ -39,7 +37,7 @@ class MemoryControllerIO(val nRows: Int, val dataBytes: Int)(implicit p: Paramet
 }
 
 class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(implicit p: Parameters) extends LazyModule {
-    val dataBytes = dataBits / 8
+    val dataBytes: Int = dataBits / 8
 
     // Real implementation
     lazy val module = new LazyModuleImp(this) with HasCoreParameters {
@@ -49,13 +47,13 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
         // load head/tail ptrs
         val headLDp = RegInit(0.U(log2Ceil(nRows).W))
         val tailLDp = RegInit(1.U(log2Ceil(nRows).W))
-        val fullLD = Wire(Bool())
+        val fullLD: Bool = Wire(Bool())
         val emptyLD = RegInit(true.B)
 
         // store head/tail ptrs
         val headSWp = RegInit(0.U(log2Ceil(nRows).W))
         val tailSWp = RegInit(1.U(log2Ceil(nRows).W))
-        val fullSW = Wire(Bool())
+        val fullSW: Bool = Wire(Bool())
         val emptySW = RegInit(true.B)
 
         // load/store address tracker
@@ -64,13 +62,12 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
         val minSWvAddr = RegInit(0.U(coreMaxAddrBits.W))
         val maxSWvAddr = RegInit(0.U(coreMaxAddrBits.W))
 
-        val (s_idle :: s_fill :: s_working :: s_write :: s_done ::
-            s_dma_wait :: s_dma_read :: s_dma_write :: Nil) = Enum(8)
+        val s_idle :: s_fill :: s_working :: s_write :: s_done :: s_dma_wait :: s_dma_read :: s_dma_write :: Nil = Enum(8)
         val stateWork = RegInit(s_idle) // determine head and tail 
         val stateDMA = RegInit(s_idle)  // determine dma read and write
 
-        val endLoad = Wire(Bool())
-        val outOfRange = Wire(Bool())
+        val endLoad: Bool = Wire(Bool())
+        val outOfRange: Bool = Wire(Bool())
 
         endLoad := (maxLDvAddr >= (io.readBaseAddr + io.length))
         outOfRange := (io.dataPtr.bits === (tailLDp * dataBytes.U - 1.U))
@@ -102,8 +99,8 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
         io.dma.resp.ready := true.B
 
         // connect the rest of the output
-        io.readScratchpadReady := ~emptyLD && (stateWork > s_fill) && ~outOfRange
-        io.findMatchBegin := (~(outOfRange || (stateDMA === s_dma_write))) && (stateWork > s_fill)
+        io.readScratchpadReady := !emptyLD && (stateWork > s_fill) && !outOfRange
+        io.findMatchBegin := (!(outOfRange || (stateDMA === s_dma_write))) && (stateWork > s_fill)
 
         when(stateWork === s_idle){
             when(io.busy){
@@ -158,7 +155,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
             // case 4: when doing copy compression, head will change with candidatePtr
             when(io.matchFound || io.equal){
                 headLDp := io.candidatePtr.bits >> log2Ceil(dataBytes) // get the line number
-                minLDvAddr := minLDvAddr + Mux(headLDp <= (io.candidatePtr.bits >> log2Ceil(dataBytes)), ((io.candidatePtr.bits >> log2Ceil(dataBytes)) - headLDp)*dataBytes.U, ((io.candidatePtr.bits >> log2Ceil(dataBytes)) - headLDp + nRows.U)*dataBytes.U)
+                minLDvAddr := minLDvAddr + Mux(headLDp <= (io.candidatePtr.bits >> log2Ceil(dataBytes)).asUInt(), ((io.candidatePtr.bits >> log2Ceil(dataBytes)).asUInt() - headLDp)*dataBytes.U, ((io.candidatePtr.bits >> log2Ceil(dataBytes)).asUInt() - headLDp + nRows.U)*dataBytes.U)
             }
 
             // case 2: when no match found but load scratchpad is full and dataPtr reaches the end of the scratchpad
@@ -180,7 +177,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
                     printf("DMA returned Out-of-range read error=true in a response (page fault?)\n")
                 }
                 .otherwise{
-                    when((headSWp === tailSWp) && ~emptySW){
+                    when((headSWp === tailSWp) && !emptySW){
                         emptySW := true.B
                     }.otherwise{
                         headLDp := headLDp + 1.U
@@ -190,7 +187,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
             }
 
             when(io.dma.req.ready && emptySW){
-                when(~io.endEncode){
+                when(!io.endEncode){
                     stateWork := s_working
                 }
                 .otherwise{
@@ -199,7 +196,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
             }
         }
         .elsewhen(stateWork === s_done){
-            when(~io.busy){
+            when(!io.busy){
                 stateWork := s_idle
             }
         }
@@ -214,7 +211,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
             when(fullSW || io.endEncode){
                 stateDMA := s_dma_write
             }
-            .elsewhen((~fullLD || outOfRange) && ~endLoad){
+            .elsewhen((!fullLD || outOfRange) && !endLoad){
                 stateDMA := s_dma_read
             }
 
@@ -228,18 +225,18 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
             }
         }
         .elsewhen(stateDMA === s_dma_write){
-            when(emptySW && fullLD && ~io.endEncode && io.dma.req.ready){
+            when(emptySW && fullLD && !io.endEncode && io.dma.req.ready){
                 stateDMA := s_dma_wait
             }
             .elsewhen(emptySW && io.endEncode && io.dma.req.ready){
                 stateDMA := s_done
             }
-            .elsewhen(emptySW && ~fullLD && io.dma.req.ready){
+            .elsewhen(emptySW && !fullLD && io.dma.req.ready){
                 stateDMA := s_dma_read
             }
         }
         .elsewhen(stateDMA === s_done){
-            when(~io.busy){
+            when(!io.busy){
                 stateDMA := s_idle
             }
         }
