@@ -23,6 +23,8 @@ class MatchFinderIO(dataWidth: Int, addressWidth: Int) extends Bundle {
   val newCandidateData = Flipped(Decoupled(UInt(dataWidth.W)))
   // global base pointer connection
   val globalBase = Input(UInt(addressWidth.W))
+  // reset the hash table
+  val clear = Input(Bool())
 
   override def cloneType: this.type = new MatchFinderIO(dataWidth, addressWidth).asInstanceOf[this.type]
 }
@@ -59,6 +61,9 @@ class MatchFinder(dataWidth: Int, addressWidth: Int, hashTableSize: Int) extends
 
   // create the hash table
   val hashTable = Module(new HashTable(32, 16, hashTableSize))
+
+  // clear the present bits in the hash table when a brand new compression job is starting
+  hashTable.io.clearPresent := io.clear
 
   // update the hash table with the new data and the offset of the new data
   hashTable.io.newData := io.newCandidateData.bits
@@ -100,6 +105,9 @@ class MatchFinderTestModule(memDataWidth: Int, dataWidth: Int, addressWidth: Int
 
   // create a matchFinder
   val matchFinder = Module(new MatchFinder(dataWidth: Int, addressWidth: Int, hashTableSize: Int))
+
+  // we don't need to clear the hash table
+  matchFinder.io.clear := false.B
 
   // create a memory
   val mem = Mem(4096, UInt(memDataWidth.W))

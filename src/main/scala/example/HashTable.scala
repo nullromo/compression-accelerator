@@ -2,7 +2,7 @@ package example
 
 import chisel3._
 import chisel3.core.dontTouch
-import chisel3.util.log2Floor
+import chisel3.util.{Cat, log2Floor}
 
 /**
   * Hash Table for compression. Takes in the new data at a given location and the offset of the new data from the base,
@@ -16,9 +16,8 @@ class HashTable(dataWidth: Int, offsetWidth: Int, hashTableSize: Int) extends Mo
     val oldData = Output(UInt(dataWidth.W))
     val oldOffset = Output(UInt(offsetWidth.W))
     val oldPresent = Output(Bool())
+    val clearPresent = Input(Bool())
   })
-
-  //TODO: the valid bits need to be cleared after the compression job is done
 
   // hash the new data to get the table address
   val address: UInt = hash(io.newData, (32 - log2Floor(hashTableSize)).U)
@@ -27,19 +26,26 @@ class HashTable(dataWidth: Int, offsetWidth: Int, hashTableSize: Int) extends Mo
   // create the underlying memories that hold the columns of the table
   val offsetMem = Mem(hashTableSize, UInt(offsetWidth.W))
   val dataMem = Mem(hashTableSize, UInt(dataWidth.W))
-  val presentMem = Mem(hashTableSize, Bool())
+  val presentMem = Reg(Vec(hashTableSize, Bool()))
 
   // write to the table
   when(io.enable) {
     offsetMem.write(address, io.newOffset)
     dataMem.write(address, io.newData)
-    presentMem.write(address, true.B)
+    when(io.clearPresent) {
+      presentMem := Cat(
+        (0 until hashTableSize).map(
+          { _ => false.B }
+        )
+      ).asTypeOf(Vec(hashTableSize, Bool()))
+    }
+    presentMem(address) := true.B
   }
 
   // read from the table
   io.oldOffset := offsetMem.read(address)
   io.oldData := dataMem.read(address)
-  io.oldPresent := presentMem.read(address)
+  io.oldPresent := presentMem(address)
 
   // hash function
   def hash(bytes: UInt, shift: UInt): UInt = {

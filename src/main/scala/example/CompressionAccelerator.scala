@@ -1,7 +1,6 @@
 package example
 
 import chisel3._
-import chisel3.core.dontTouch
 import chisel3.util._
 import chisel3.util.experimental.loadMemoryFromFile
 import external.{FrontendTLB, Scratchpad, ScratchpadMemRequest}
@@ -180,6 +179,8 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
       // ...
     }
   }
+
+  matchFinder.io.clear := cmd.fire()
 
 
   //TODO: figure out how to use these properly
