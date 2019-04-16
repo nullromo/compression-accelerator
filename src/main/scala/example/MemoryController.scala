@@ -37,6 +37,7 @@ class MemoryControllerIO(val nRows: Int, val dataBytes: Int)(implicit p: Paramet
 
 class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(implicit p: Parameters) extends LazyModule {
   val dataBytes: Int = dataBits / 8
+
   override lazy val module = new MemoryControllerImp(this)
 }
 
@@ -72,22 +73,22 @@ class MemoryControllerImp(outer: MemoryController)(implicit p: Parameters) exten
   val outOfRange: Bool = Wire(Bool())
 
   endLoad := (maxLDvAddr >= (io.readBaseAddr + io.length))
-  outOfRange := (io.dataPtr.bits === (tailLDp * dataBytes.U - 1.U))
+  outOfRange := (io.dataPtr.bits === ((tailLDp << log2Ceil(dataBytes)).asUInt() - 1.U))
 
   // min virtual address
-  minvAddr := minLDvAddr
-  maxvAddr := maxLDvAddr
+  io.minvAddr := minLDvAddr
+  io.maxvAddr := maxLDvAddr
 
   // full logic
-  fullLD := ~(headLDp === tailLDp)
-  fullSW := ~(headSWp === tailSWp)
+  fullLD := (headLDp === tailLDp)
+  fullSW := (headSWp === tailSWp)
 
   // store compressed data into scratchpad
   // -- because each dma store needs to store all data in store scratchpad, tail should not move during write tp L2$
   when(io.storeData.fire()) {
     tailSWp := tailSWp + 1.U
   }
-  io.storeData.ready := ~(fullSW || (stateDMA === s_dma_write))
+  io.storeData.ready := !(fullSW || (stateDMA === s_dma_write))
 
   // dma request logic
   // -- DMA will send request when stateDMA is at s_dma_read or s_dma_write
@@ -97,7 +98,7 @@ class MemoryControllerImp(outer: MemoryController)(implicit p: Parameters) exten
   io.dma.req.bits.spaddr := Mux(stateDMA === s_dma_read, tailLDp, tailSWp)
   io.dma.req.bits.spbank := Mux(stateDMA === s_dma_read, 0.U, 1.U)
   io.dma.req.bits.write := stateDMA === s_dma_write
-  io.dma.req.valid := ((stateDMA === s_dma_read) || (stateDMA === s_dma_write))
+  io.dma.req.valid := ((stateDMA === s_dma_read && !fullLD) || (stateDMA === s_dma_write && !emptySW))
   io.dma.resp.ready := true.B
 
   // connect the rest of the output
@@ -157,13 +158,15 @@ class MemoryControllerImp(outer: MemoryController)(implicit p: Parameters) exten
       // case 4: when doing copy compression, head will change with candidatePtr
       when(io.matchFound || io.equal) {
         headLDp := io.candidatePtr.bits >> log2Ceil(dataBytes) // get the line number
-        minLDvAddr := minLDvAddr + Mux(headLDp <= (io.candidatePtr.bits >> log2Ceil(dataBytes)).asUInt(), ((io.candidatePtr.bits >> log2Ceil(dataBytes)).asUInt() - headLDp) * dataBytes.U, ((io.candidatePtr.bits >> log2Ceil(dataBytes)).asUInt() - headLDp + nRows.U) * dataBytes.U)
+        minLDvAddr := minLDvAddr + Mux(headLDp <= (io.candidatePtr.bits >> log2Ceil(dataBytes)).asUInt(),
+          ((io.candidatePtr.bits >> log2Ceil(dataBytes)).asUInt() - headLDp) * dataBytes.U,
+          ((io.candidatePtr.bits >> log2Ceil(dataBytes)).asUInt() - headLDp + nRows.U) * dataBytes.U)
       }
 
       // case 2: when no match found but load scratchpad is full and dataPtr reaches the end of the scratchpad
       //        -- move head first and then tail together
       //        -- request DMA
-      when((io.dataPtr.bits === (tailLDp * dataBytes.U - 1.U)) && fullLD) {
+      when((io.dataPtr.bits === ((tailLDp << log2Ceil(dataBytes)).asUInt() - 1.U)) && fullLD) {
         headLDp := headLDp + 1.U
         minLDvAddr := minLDvAddr + dataBytes.U
       }
@@ -179,10 +182,10 @@ class MemoryControllerImp(outer: MemoryController)(implicit p: Parameters) exten
           printf("DMA returned Out-of-range read error=true in a response (page fault?)\n")
         }
           .otherwise {
-            when((headSWp === tailSWp) && !emptySW) {
+            when((headSWp === (tailSWp - 1.U)) && !emptySW) {
               emptySW := true.B
             }.otherwise {
-              headLDp := headLDp + 1.U
+              headSWp := headSWp + 1.U
             }
             minSWvAddr := minSWvAddr + dataBytes.U
           }
@@ -242,4 +245,5 @@ class MemoryControllerImp(outer: MemoryController)(implicit p: Parameters) exten
         stateDMA := s_idle
       }
     }
-} 
+
+}
