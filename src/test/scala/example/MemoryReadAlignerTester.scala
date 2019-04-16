@@ -16,6 +16,9 @@ class MemoryReadAlignerTester(c: MemoryReadAlignerTestModule, sequential: Boolea
     lineNum += 1
   }
 
+  // how much to add to the address each time when doing non-sequential access
+  val nonSequentialAddressPattern: Seq[Int] = Seq(4, -2, 1, 1, 1)
+
   // keep track of test cycles
   var cycles = 0
 
@@ -26,13 +29,13 @@ class MemoryReadAlignerTester(c: MemoryReadAlignerTestModule, sequential: Boolea
   // look up some addresses in order
   var numAddresses = 0
   var address = 0
-  while (numAddresses < 30) {
+  while (numAddresses < 30 && cycles < 1000) {
 
     // put in the address
     poke(c.io.readIO.address.bits, address)
 
     // read when the data is valid
-    if (peek(c.io.readIO.data.valid) != 0 && cycles < 1000) {
+    if (peek(c.io.readIO.data.valid) != 0) {
       val dataOut = peek(c.io.readIO.data.bits)
       val dataString = format(dataOut, 4)
       val expectedDataString = memMap(address) + memMap(address + 1) + memMap(address + 2) + memMap(address + 3)
@@ -43,11 +46,11 @@ class MemoryReadAlignerTester(c: MemoryReadAlignerTestModule, sequential: Boolea
 
     // increment the address if ready to
     if (peek(c.io.readIO.address.ready) != 0) {
-      numAddresses += 1
       if (sequential)
         address += 1
       else
-        address += 3
+        address += nonSequentialAddressPattern(numAddresses % nonSequentialAddressPattern.length)
+      numAddresses += 1
     }
 
     s(1)

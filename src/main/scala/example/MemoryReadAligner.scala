@@ -67,17 +67,10 @@ class MemoryReadAligner(readAddressWidth: Int, readDataWidth: Int, memAddressWid
   }
 
   // select the correct output
-  //TODO: do this the correct, parameterized way. Something like the loop below, but without the combinational loop
-  //  for (i <- 0 until readBytes) {
-  //    io.readIO.data.bits := Cat(io.readIO.data.bits,
-  //      aggregateReadData((memBytes * 2).U - lowerReadOffset - (1 + i).U)
-  //    )
-  //  }
   io.readIO.data.bits := Cat(
-    aggregateReadData((memBytes * 2).U - lowerReadOffset - 1.U),
-    aggregateReadData((memBytes * 2).U - lowerReadOffset - 2.U),
-    aggregateReadData((memBytes * 2).U - lowerReadOffset - 3.U),
-    aggregateReadData((memBytes * 2).U - lowerReadOffset - 4.U),
+    (1 to readBytes).map({
+      i => aggregateReadData((memBytes * 2).U - lowerReadOffset - i.U)
+    })
   )
 
   // the read data output of this module is only valid if the cached data was valid

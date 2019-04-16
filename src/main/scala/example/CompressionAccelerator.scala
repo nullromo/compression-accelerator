@@ -65,30 +65,10 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   cmd.ready := !busy
   io.busy := busy
 
-  // components for state machine
-  val ip_end    = RegInit( 0.U(32.W))
-  val base_ip   = RegInit( 0.U(32.W))
-  val next_emit = RegInit( 0.U(32.W))
+  // constants for compression
   val kInputMarginBytes: UInt = 15.U
-  val ip_limit  = RegInit( 0.U(32.W))
-  val ip        = RegInit( 0.U(32.W))
-  val op        = RegInit( 0.U(32.W))
-  val n         = RegInit( 0.U(32.W))
-  val base      = RegInit( 0.U(32.W))
-  val count     = RegInit( 0.U(32.W))
-  val prev_ip   = RegInit( 0.U(32.W))
-  dontTouch(ip_end)
-  dontTouch(base_ip)
-  dontTouch(next_emit)
-  dontTouch(ip_limit)
-  dontTouch(ip)
-  dontTouch(op)
-  dontTouch(n)
-  dontTouch(base)
-  dontTouch(count)
-  dontTouch(prev_ip)
-
-
+  val inputEnd: UInt = src + length
+  val inputLimit: UInt = inputEnd - kInputMarginBytes
 
 
 
@@ -97,17 +77,49 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   val fakeScratchpad = Mem(params.scratchpadEntries, UInt(params.scratchpadWidth.W))
   loadMemoryFromFile(fakeScratchpad, "memdata/memdata_1.txt")
 
+  // adapter to read the scratchpad byte-by-byte in 32-bit chunks
+  val aligner = Module(new MemoryReadAligner(
+    32, 32, 32, 64
+  ))
+
+  // connect the aligner to the memory
+  aligner.io.memIO.data := fakeScratchpad.read(aligner.io.memIO.address)
+
+  // addresses sent to the aligner are always valid, but the aligner may choose not to be ready
+  aligner.io.readIO.address.valid := true.B
+
+  // the memory is always ready to be used by the aligner, but the aligner may not always be valid
+  aligner.io.readIO.data.ready := true.B
+
+  // tells the match finder where to begin a sequence
+  val matchSearchAddress = RegInit(0.U(32.W))
+
+  // pointer to tell the match finder where to start looking
+  val basePointer = RegInit(0.U(32.W))
+
+  // scans the scratchpad for matches
+  val matchFinder = Module(new MatchFinder(params.scratchpadWidth, 32, params.hashTableSize))
+
+  // pass in the global src pointer
+  matchFinder.io.globalBase := src
+
+  //
+  matchFinder.io.start.bits := matchSearchAddress
+
+  matchFinder.io.newCandidateData <> aligner.io.readIO.data
+  aligner.io.readIO.address <> matchFinder.io.memoryReadAddress
+
+
+
+  matchFinder.io.start.valid := ???
 
 
 
 
-//  val matchFinder = Module(new MatchFinder(params.scratchpadWidth, 32, params.hashTableSize))
-//  matchFinder.io.start := startLooking
-//  matchFinder.io.basePointer := basePointer
-//  matchFinder.io.newCandidateData := fakeScratchpad.read(matchFinder.io.memoryReadAddress)
-//   := matchFinder.io.matchFound
-//   := matchFinder.io.matchBegin
-//   := matchFinder.io.matchEnd
+
+
+
+
 
 
 
@@ -161,14 +173,8 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
       maxScratchpadAddress := cmd.bits.rs1
       //TODO: some of the signals are redundant
       busy := true.B
-      op := cmd.bits.rs2
       src := cmd.bits.rs1
       dst := cmd.bits.rs2
-      ip_end := cmd.bits.rs1 + length
-      base_ip := cmd.bits.rs1
-      next_emit := cmd.bits.rs1
-      ip_limit := cmd.bits.rs1 + length - kInputMarginBytes
-      ip := cmd.bits.rs1 + 1.U
     }.elsewhen(doUncompress) {
       busy := true.B
       // ...

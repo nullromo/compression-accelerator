@@ -1,57 +1,55 @@
 package example
 
 import chisel3.iotesters.{ChiselFlatSpec, Driver, PeekPokeTester}
-import scala.util.control.Breaks._
 
 class MatchFinderTester(c: MatchFinderTestModule) extends PeekPokeTester(c) {
   // keep track of test cycles
   var cycles = 0
 
-  // always be ready for output
+  // hold all the matches found by the module
+  var matchesFound: Array[(BigInt, BigInt)] = Array[(BigInt, BigInt)]()
+
+  // always be ready for output and always send valid input
   poke(c.io.out.ready, true)
+  poke(c.io.start.valid, true)
 
   // set global base
-  poke(c.io.globalBase, 100)
+  poke(c.io.globalBase, 0)
 
   // keep track of pointers
-  var base: BigInt = 100
-  var end: BigInt = 100
+  var base: BigInt = 0
+  var end: BigInt = 0
 
   // count matches found
   var matches = 0
 
   // find matches
-  while(base < 1024) {
+  while (base < 69 && cycles < 10000) {
 
-    // send in some input
-    poke(c.io.start.valid, true)
+    // send in the input
     poke(c.io.start.bits, base)
-    s(1)
 
-    // stop sending input
-    poke(c.io.start.valid, false)
-
-    // wait for output to be valid (but don't wait forever)
-    while (peek(c.io.out.valid) == 0) {
-      if(cycles > 10000) {
-        println("Too many cycles")
-        break
-      }
-      s(1)
+    // if the output is valid, deal with it
+    if (peek(c.io.out.valid) != 0) {
+      base = peek(c.io.out.bits.matchA)
+      end = peek(c.io.out.bits.matchB)
+      matches += 1
+      println("match found: " + base + " to " + end)
+      matchesFound = matchesFound :+ (base, end)
+      base = end + 1
     }
 
-    // match found!
-    matches += 1
-    base = peek(c.io.out.bits.matchA)
-    end = peek(c.io.out.bits.matchB)
-    println("match found: " + base + " to " + end)
-
-    // set up for the next search
-    base = end + 1
     s(1)
   }
 
   println(matches + " matches found.")
+
+  // expected matches based on file
+  val expectedMatches = Array(
+    (0, 44), (20, 57), (16, 70)
+  )
+
+  expect(expectedMatches sameElements matchesFound, "Wrong matches :(")
 
   def s(n: Int): Unit = {
     step(n)
@@ -60,7 +58,8 @@ class MatchFinderTester(c: MatchFinderTestModule) extends PeekPokeTester(c) {
 }
 
 class MatchFinderSpec extends ChiselFlatSpec {
-  val dutGen: () => MatchFinderTestModule = () => new MatchFinderTestModule(8, 32, 512)
+  val dutGen: () => MatchFinderTestModule = () => new MatchFinderTestModule(
+    64, 32, 32, 512)
   "MatchFinder" should "find matches" in {
     Driver.execute(TesterArgs() :+ "MatchFinder", dutGen) {
       c => new MatchFinderTester(c)

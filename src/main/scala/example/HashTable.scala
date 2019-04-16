@@ -15,25 +15,31 @@ class HashTable(dataWidth: Int, offsetWidth: Int, hashTableSize: Int) extends Mo
     val enable = Input(Bool())
     val oldData = Output(UInt(dataWidth.W))
     val oldOffset = Output(UInt(offsetWidth.W))
+    val oldPresent = Output(Bool())
   })
+
+  //TODO: the valid bits need to be cleared after the compression job is done
 
   // hash the new data to get the table address
   val address: UInt = hash(io.newData, (32 - log2Floor(hashTableSize)).U)
   dontTouch(address)
 
-  // create the underlying memories that hold the 2 columns of the table
+  // create the underlying memories that hold the columns of the table
   val offsetMem = Mem(hashTableSize, UInt(offsetWidth.W))
   val dataMem = Mem(hashTableSize, UInt(dataWidth.W))
+  val presentMem = Mem(hashTableSize, Bool())
 
   // write to the table
   when(io.enable) {
     offsetMem.write(address, io.newOffset)
     dataMem.write(address, io.newData)
+    presentMem.write(address, true.B)
   }
 
   // read from the table
   io.oldOffset := offsetMem.read(address)
   io.oldData := dataMem.read(address)
+  io.oldPresent := presentMem.read(address)
 
   // hash function
   def hash(bytes: UInt, shift: UInt): UInt = {
