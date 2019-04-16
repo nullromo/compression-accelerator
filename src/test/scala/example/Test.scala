@@ -16,7 +16,7 @@ import java.io.PrintWriter
 
 class CompressionAcceleratorTester(c: ScratchpadTestModule) extends PeekPokeTester(c) {
 	val randgen = new Random(15)
-	val memory_data = Array.fill[Seq[Int]](8)(Array.fill[Int]((pow(2,10)-1).toInt)(randgen.nextInt(256)))
+	val memory_data = Array.fill[Seq[Int]](8)(Array.fill[Int]((pow(2,8)-1).toInt)(randgen.nextInt(256)))
 
 	for(i <- 0 until 8){
 		val fileName = "memdata/memdata.hex_" + i + ".txt"
@@ -31,6 +31,22 @@ class CompressionAcceleratorTester(c: ScratchpadTestModule) extends PeekPokeTest
 		//val mem = "ram.mem_" + i
 		//loadMemFromFile(fileName, mem)
 	}
+
+	val fileNameall = "memdata/memdata.hex.txt"
+	val writerall = new PrintWriter(new File(fileNameall))
+	for(i <- 0 until memory_data(0).length){
+		var storeData: String = ""
+		for(k <- 0 until 8){
+			if(memory_data(k)(i) < 16)
+				storeData = storeData + "0" + memory_data(k)(i).toHexString
+			else
+				storeData = storeData + memory_data(k)(i).toHexString
+		}
+		writerall.write(storeData)			
+		if(i != memory_data(0).length -1)
+			writerall.write("\n")
+	}
+	writerall.close()
 	//val mem = "ram.mem_" + i
 	//loadMemFromFile(fileName, mem)
 	//val mem_array = Array.ofDim[String](8)
@@ -40,13 +56,13 @@ class CompressionAcceleratorTester(c: ScratchpadTestModule) extends PeekPokeTest
   
 	// set length
     poke(c.io.cmd.bits.inst.funct, 2) // doSetLength
-    poke(c.io.cmd.bits.rs1, 100) // length = 100
+    poke(c.io.cmd.bits.rs1, 4000) // length = 100
     poke(c.io.cmd.valid, true) // fire
     step(1)
     // compress
     poke(c.io.cmd.bits.inst.funct, 0) // doCompress
     poke(c.io.cmd.bits.rs1, 0x0000) // src = 0
-    poke(c.io.cmd.bits.rs2, 0x2000) // dst = 100
+    poke(c.io.cmd.bits.rs2, 0x1000) // dst = 100
     step(1)
     poke(c.io.cmd.valid, false)
     step(4000)

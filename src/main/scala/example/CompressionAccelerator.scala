@@ -26,7 +26,7 @@ class CompressionAccelerator(opcodes: OpcodeSet, params: CompressionParameters =
   extends LazyRoCC(opcodes, nPTWPorts = 1) {
   override lazy val module = new CompressionAcceleratorModule(this, params)
   val scratchpad = LazyModule(new Scratchpad(params.scratchpadBanks, params.scratchpadEntries, params.scratchpadWidth))
-  val memoryctrl = LazyModule(new MemoryContrller(params.scratchpadEntries, params.scratchpadWidth))
+  val memoryctrl = LazyModule(new MemoryController(params.scratchpadEntries, params.scratchpadWidth))
   override val tlNode: TLIdentityNode = scratchpad.node
 }
 
@@ -144,7 +144,6 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   val endEncode = RegInit(false.B)
   val storeData_bits = RegInit(0.U((params.scratchpadWidth).W))
   val storeData_valid = RegInit(false.B)
-  val storeData_ready = Wire(Bool())
 
 
   // -----------------------------------------
@@ -303,7 +302,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     memoryctrlIO.matchFound := matchFound
     memoryctrlIO.equal := equal
     memoryctrlIO.endEncode := endEncode
-    memoryctrlIO.dma := scratchpadIO.dma
+ 	scratchpadIO.dma <> memoryctrlIO.dma
 
     when(teststate === s_idle){
       when(memoryctrlIO.readScratchpadReady === true.B){
@@ -340,7 +339,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
       }
     }
     .elsewhen(teststate === s_write){
-      when(io.storeData.ready){
+      when(memoryctrlIO.storeData.ready){
         teststate := s_match
         candidatePtr := 42.U
         dataPtr := 71.U
@@ -360,9 +359,9 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     scratchpadIO.write(1).addr := counter
     scratchpadIO.write(1).data := counter + 1.U
     memoryctrlIO.storeData.bits := counter + 1.U
-    memoryctrlIO.storeData.vaild := (teststate === s_nomatch && counter < 128.U)
-    matchFound := (matchCounter === 0.U)
-    equal := (matchCounter < 128.U)
+    memoryctrlIO.storeData.valid := (teststate === s_nomatch && counter < 128.U)
+    matchFound := (matchCounter === 0.U && teststate === s_match)
+    equal := (matchCounter < 128.U && teststate === s_match)
   // ------------------------------------------------------------
 
 
