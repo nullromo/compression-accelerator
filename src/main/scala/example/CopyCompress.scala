@@ -1,9 +1,10 @@
 package example
 
 import chisel3._
-import chisel3.util._
-import scala.math._
 import chisel3.experimental.dontTouch
+import chisel3.util._
+
+import scala.math._
 
 trait CopyCompressParams{
     val parallellane: Int
@@ -27,7 +28,7 @@ class CopyCompressIO (params: CopyCompressParams) extends Bundle{
     override def cloneType: this.type = CopyCompressIO(params).asInstanceOf[this.type]
 }
 object CopyCompressIO{
-    def apply (params: CopyCompressParams) : CopyCompressIO = 
+    def apply (params: CopyCompressParams) : CopyCompressIO =
         new CopyCompressIO(params)
 }
 
@@ -99,7 +100,7 @@ class CopyCompress (val params: CopyCompressParams) extends Module{
 
     // flag indicating whether the compression reaches the end
     reachEnd := (num_data_valid === 0.U) && (io.remain === 0.U)
-    
+
     when(start_reg & copyStreamFormer.io.start.ready){
 
         io.bufferPtrInc.bits := 0.U // default value
@@ -118,7 +119,7 @@ class CopyCompress (val params: CopyCompressParams) extends Module{
                     }
                 }
             }
-            
+
             lengthAccum := lengthAccum + io.bufferPtrInc.bits
             io.bufferPtrInc.valid := true.B
             when(io.bufferPtrInc.bits === num_data_valid){
@@ -188,7 +189,7 @@ class CopyStreamFormerIO (params: CopyCompressParams) extends Bundle{
     override def cloneType: this.type = CopyStreamFormerIO(params).asInstanceOf[this.type]
 }
 object CopyStreamFormerIO{
-    def apply (params: CopyCompressParams) : CopyStreamFormerIO = 
+    def apply (params: CopyCompressParams) : CopyStreamFormerIO =
         new CopyStreamFormerIO(params)
 }
 
