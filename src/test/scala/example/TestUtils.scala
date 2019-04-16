@@ -1,5 +1,6 @@
 package example
 
+import freechips.rocketchip.config.Parameters
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.system._
 import treadle.TreadleTester
@@ -10,7 +11,7 @@ import scala.io.Source
   * Specify command-line type parameters for running the tests.
   */
 object TesterArgs {
-  def apply() = {
+  def apply(): Array[String] = {
     Array(
 	  "-tbn",
 	  "verilator",
@@ -26,7 +27,7 @@ object TesterArgs {
   * Get parameters for the accelerator from the full system.
   */
 object AcceleratorParams {
-  def apply() = {
+  def apply(): Parameters = {
     // Elaborate the full system first to get the tile parameters needed for RoCC
     // e.g. SharedMemoryTLEdge and TileKey
     val tileParams = LazyModule(new ExampleRocketSystem()(new CompressionAcceleratorConfig)).rocketTiles.head.p

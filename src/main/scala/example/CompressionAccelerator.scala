@@ -1,8 +1,8 @@
 package example
 
 import chisel3._
-import chisel3.core.dontTouch
 import chisel3.util._
+import chisel3.util.experimental.loadMemoryFromFile
 import external.{FrontendTLB, Scratchpad, ScratchpadMemRequest}
 import freechips.rocketchip.config.Parameters
 import freechips.rocketchip.diplomacy.LazyModule
@@ -67,61 +67,8 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   cmd.ready := !busy
   io.busy := busy
 
-  // components for state machine
-  val ip_end    = RegInit( 0.U(32.W))
-  val base_ip   = RegInit( 0.U(32.W))
-  val next_emit = RegInit( 0.U(32.W))
+  // constants for compression
   val kInputMarginBytes: UInt = 15.U
-  val ip_limit  = RegInit( 0.U(32.W))
-  val skip      = RegInit(32.U(32.W))
-  val ip        = RegInit( 0.U(32.W))
-  val op        = RegInit( 0.U(32.W))
-  val n         = RegInit( 0.U(32.W))
-  val base      = RegInit( 0.U(32.W))
-  val count     = RegInit( 0.U(32.W))
-  val prev_ip   = RegInit( 0.U(32.W))
-  dontTouch(ip_end)
-  dontTouch(base_ip)
-  dontTouch(next_emit)
-  dontTouch(ip_limit)
-  dontTouch(skip)
-  dontTouch(ip)
-  dontTouch(op)
-  dontTouch(n)
-  dontTouch(base)
-  dontTouch(count)
-  dontTouch(prev_ip)
-
-  // define bytes between hash lookups for searching for matches
-  val bbhl: UInt = Wire(UInt(32.W))
-  bbhl := (skip >> 5.U).asUInt()
-  dontTouch(bbhl)
-
-  // create the hash table
-  val hashTable = Module(new HashTable(32, 16, params.hashTableSize))
-
-  // values coming out of the hash table
-  val oldCandidateData: UInt = Wire(UInt(32.W))
-  val oldCandidateOffset: UInt = Wire(UInt(16.W))
-
-  // values going into the hash table
-  val newCandidateData: UInt = Wire(UInt(32.W))
-  val newCandidateOffset: UInt = Wire(UInt(16.W))
-  newCandidateData := scratchpadIO.read(0)(0).data
-  newCandidateOffset := ip - base_ip
-
-  // connect hash table
-  hashTable.io.newData := newCandidateData
-  hashTable.io.newOffset := newCandidateOffset
-  oldCandidateData := hashTable.io.oldData
-  oldCandidateOffset := hashTable.io.oldOffset
-
-  //TODO: this will have some more control logic
-  hashTable.io.enable := true.B
-
-  // ture when a match has been found
-  val matchFound: Bool = Wire(Bool())
-  //matchFound := oldCandidateData === newCandidateData
 
   // ----- TEST ScratchPad Settings ----------
   /*val writeScratchPadCounter = RegInit(100.U(8.W))
@@ -149,10 +96,6 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   // -----------------------------------------
   
 
-
-  prev_ip := ip
-  skip := skip + bbhl
-  ip := ip + bbhl
 
 
 
@@ -193,7 +136,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
       scratchpadBufferController.io.write := true.B
     }
   }
-
+  */
 
   // Testing whether Scratchpad fills in or not
   scratchpadIO.read.foreach{(a) => a(0).en := busy}
@@ -328,7 +271,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
         dataPtr := (8-1).U
         teststate := s_stop_wait // head and tail should move together
       }
-      .elsewhen(~memoryctrlIO.storeData.ready){
+      .elsewhen(!memoryctrlIO.storeData.ready){
         teststate := s_write
       }
 
@@ -349,7 +292,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
       matchCounter := matchCounter + 1.U
       candidatePtr := candidatePtr + 1.U
       dataPtr := dataPtr + 1.U
-      when(~equal){
+      when(!equal){
         teststate := s_done
       }
 
@@ -375,19 +318,15 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
       minWriteAddress := cmd.bits.rs2
       //TODO: some of the signals are redundant
       busy := true.B
-      op := cmd.bits.rs2
       src := cmd.bits.rs1
       dst := cmd.bits.rs2
-      ip_end := cmd.bits.rs1 + length
-      base_ip := cmd.bits.rs1
-      next_emit := cmd.bits.rs1
-      ip_limit := cmd.bits.rs1 + length - kInputMarginBytes
-      ip := cmd.bits.rs1 + 1.U
     }.elsewhen(doUncompress) {
       busy := true.B
       // ...
     }
   }
+
+  matchFinder.io.clear := cmd.fire()
 
 
   //TODO: figure out how to use these properly
@@ -399,7 +338,8 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 }
 
 object DMAUtils {
-  def makeDMARequest(write: Bool, virtualAddress: UInt, scratchpadAddress: UInt)(implicit p: Parameters, params: CompressionParameters): ScratchpadMemRequest = {
+  def makeDMARequest(write: Bool, virtualAddress: UInt, scratchpadAddress: UInt)
+                    (implicit p: Parameters, params: CompressionParameters): ScratchpadMemRequest = {
     val req = Wire(new ScratchpadMemRequest(params.scratchpadBanks, params.scratchpadEntries))
     req.vaddr := virtualAddress
     req.spbank := 0.U
