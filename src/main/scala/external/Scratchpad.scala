@@ -189,11 +189,13 @@ class Scratchpad(
     io.tlb.req.bits.cmd := Mux(req.write, M_XWR, M_XRD)
     io.tlb.resp.ready := state === s_translate_resp
 
-    val tlberr = Mux(req.write,
+    // Fake way to bypass TLB!!!!!!!!!!!!
+	//val tlberr = false.B
+	val tlberr = Mux(req.write,
       io.tlb.resp.bits.pf.st || io.tlb.resp.bits.ae.st,
       io.tlb.resp.bits.pf.ld || io.tlb.resp.bits.ae.ld)
-//    printf("pf: %d\n", io.tlb.resp.bits.pf.ld)
-//    printf("ae: %d\n", io.tlb.resp.bits.ae.ld)
+	  //printf("pf: %d\n", io.tlb.resp.bits.pf.ld)
+	  //printf("ae: %d\n", io.tlb.resp.bits.ae.ld)
 
     val nextVaddr = Cat(reqVpn + 1.U, 0.U(pgIdxBits.W))
     val pageBytes = nextVaddr - req.vaddr
@@ -265,7 +267,7 @@ class Scratchpad(
       read(0).data := bank.io.read(0).data
       read(1).data := bank.io.read(1).data
       when (req.spbank === i.U) { dmardata := bank.io.read(0).data }
-      when (req.spbank === i.U) { dmardata := bank.io.read(1).data }
+      //when (req.spbank === i.U) { dmardata := bank.io.read(1).data }
 
       bank.io.write.en := bankwen || write.en
       bank.io.write.addr := Mux(bankwen, req.spaddr, write.addr)
@@ -295,7 +297,8 @@ class Scratchpad(
         error := true.B
         state := s_respond
       } .otherwise {
-        reqPpn := io.tlb.resp.bits.paddr >> pgIdxBits.U
+		// Fake way to bypass TLB!!!!!!!!!!!!!!!!
+        reqPpn := /*reqVpn*/io.tlb.resp.bits.paddr >> pgIdxBits.U
         state := Mux(req.write, s_writereq, s_readreq)
       }
     }

@@ -2,10 +2,10 @@ package example
 
 import chisel3._
 import freechips.rocketchip.config.{Config, Parameters}
-import freechips.rocketchip.subsystem.{WithNBigCores, WithNMemoryChannels, WithRV32, WithRoccExample}
+import freechips.rocketchip.subsystem.{WithNBigCores, WithNMemoryChannels, WithRV32, WithRoccExample,RocketTilesKey}
 import freechips.rocketchip.diplomacy.{LazyModule, ValName}
 import freechips.rocketchip.devices.tilelink.BootROMParams
-import freechips.rocketchip.rocket.HasRocketCoreParameters
+import freechips.rocketchip.rocket.{HasRocketCoreParameters, RocketCoreParams}
 import freechips.rocketchip.tile.{BuildRoCC, HasCoreParameters, OpcodeSet, XLen}
 import testchipip._
 
@@ -90,6 +90,8 @@ class WithCompressionAccelerator extends Config((site, here, up) => {
       new CompressionAccelerator(OpcodeSet.custom3)(p)
     )
   )
+  case RocketTilesKey => up(RocketTilesKey, site).map(_.copy(
+	core = RocketCoreParams(nPMPs = 0)))
 })
 
 class CompressionAcceleratorConfig extends Config(

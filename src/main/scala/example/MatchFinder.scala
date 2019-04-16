@@ -71,6 +71,7 @@ class MatchFinder(dataWidth: Int, addressWidth: Int, hashTableSize: Int) extends
 
   // true when a match has been found
   val matchFound: Bool = Wire(Bool())
+
   matchFound := hashTable.io.oldPresent &&
     (hashTable.io.oldData === io.newCandidateData.bits) &&
     io.newCandidateData.valid &&
