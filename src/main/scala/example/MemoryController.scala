@@ -99,6 +99,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
         io.dma.req.bits.spbank := Mux(stateDMA === s_dma_read, 0.U, 1.U)
         io.dma.req.bits.write := stateDMA === s_dma_write
         io.dma.req.valid := ((stateDMA === s_dma_read) || (stateDMA === s_dma_write))
+        io.dma.resp.ready := true.B
 
         // connect the rest of the output
         io.readScratchpadReady := ~emptyLD && (stateWork > s_fill) && ~outOfRange
