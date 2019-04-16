@@ -18,14 +18,15 @@ case class CompressionParameters(hashTableSize: Int,
 
 object DefaultCompressionParameters extends CompressionParameters(
   hashTableSize = 4096,
-  scratchpadBanks = 1,
-  scratchpadEntries = 4096,
+  scratchpadBanks = 2,
+  scratchpadEntries = 128,
   scratchpadWidth = 64)
 
 class CompressionAccelerator(opcodes: OpcodeSet, params: CompressionParameters = DefaultCompressionParameters)(implicit p: Parameters)
   extends LazyRoCC(opcodes, nPTWPorts = 1) {
   override lazy val module = new CompressionAcceleratorModule(this, params)
   val scratchpad = LazyModule(new Scratchpad(params.scratchpadBanks, params.scratchpadEntries, params.scratchpadWidth))
+  val memoryctrl = LazyModule(new MemoryContrller(params.scratchpadEntries, params.scratchpadWidth))
   override val tlNode: TLIdentityNode = scratchpad.node
 }
 
@@ -34,7 +35,9 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 
   // get a reference to the scratchpad inside the implementation module
   import outer.scratchpad
+  import outer.memoryctrl
   val scratchpadIO = scratchpad.module.io
+  val memoryctrlIO = memoryctrl.module.io
 
   // connect the scratchpad to the L2 cache
   implicit val edge: TLEdgeOut = outer.tlNode.edges.out.head
@@ -118,10 +121,10 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 
   // ture when a match has been found
   val matchFound: Bool = Wire(Bool())
-  matchFound := oldCandidateData === newCandidateData
+  //matchFound := oldCandidateData === newCandidateData
 
   // ----- TEST ScratchPad Settings ----------
-  val writeScratchPadCounter = RegInit(100.U(8.W))
+  /*val writeScratchPadCounter = RegInit(100.U(8.W))
   val teststate = RegInit(0.U(3.W))
   val sInit_test = 0.U
   val sWriteScratchPad_test = 1.U
@@ -129,7 +132,24 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   val sReadMemReverse_test = 3.U
   val sReadScratchPad_test = 4.U
   val sDone_test = 5.U
-  val scratchpadPtr = RegInit(0.U(32.W))
+  val scratchpadPtr = RegInit(0.U(32.W))*/
+
+  // ------ TEST memory controller -----------
+  val (s_idle :: s_fill :: s_nomatch :: s_write :: s_match ::
+       s_stop_wait :: s_done :: Nil) = Enum(7)
+  val teststate = RegInit(s_idle)
+  val dataPtr = RegInit(0.U(log2Ceil(params.scratchpadEntries*8).W))
+  val candidatePtr = RegInit(0.U(log2Ceil(params.scratchpadEntries*8).W))
+  val equal = Wire(Bool())
+  val endEncode = RegInit(false.B)
+  val storeData_bits = RegInit(0.U((params.scratchpadWidth).W))
+  val storeData_valid = RegInit(false.B)
+  val storeData_ready = Wire(Bool())
+
+
+  // -----------------------------------------
+  
+
 
   prev_ip := ip
   skip := skip + bbhl
@@ -144,6 +164,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   // keep track of the range that the scratchpad contains
   val minScratchpadAddress = RegInit(0.U(32.W))
   val maxScratchpadAddress = RegInit(0.U(32.W))
+  val minWriteAddress = RegInit(0.U(32.W))
 
   //TODO: make sure not to read and write the scratchpad at the same time if it's empty or full
 
@@ -182,7 +203,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 
 
   	// ------ TEST ScrathPad ------------------------
-	scratchpadIO.write.foreach{(a) => a.en := teststate === sWriteScratchPad_test}
+	/*scratchpadIO.write.foreach{(a) => a.en := teststate === sWriteScratchPad_test}
 	scratchpadIO.write.foreach{(a) => a.addr := scratchpadPtr >> 3}
 	scratchpadIO.write.foreach{(a) => a.data := scratchpadPtr}
 
@@ -269,7 +290,82 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 		}
 		printf("data is: %d\n", scratchpadIO.read(0)(0).data)
 	}
-	
+  */
+	// -------------- Test Memory Controller ----------------------
+    val counter = RegInit(0.U(7.W))
+    val matchCounter = RegInit(0.U(7.W))
+    memoryctrlIO.readBaseAddr := minScratchpadAddress
+    memoryctrlIO.writeBaseAddr := minWriteAddress
+    memoryctrlIO.length := length
+    memoryctrlIO.busy := busy
+    memoryctrlIO.dataPtr.bits := dataPtr
+    memoryctrlIO.candidatePtr.bits := candidatePtr
+    memoryctrlIO.matchFound := matchFound
+    memoryctrlIO.equal := equal
+    memoryctrlIO.endEncode := endEncode
+    memoryctrlIO.dma := scratchpadIO.dma
+
+    when(teststate === s_idle){
+      when(memoryctrlIO.readScratchpadReady === true.B){
+        teststate := s_nomatch
+      }
+    }
+    .elsewhen(teststate === s_nomatch){
+      counter := counter + 1.U
+      when(counter === 2.U){
+        dataPtr := 2.U
+      }
+      .elsewhen(counter === 6.U){
+        dataPtr := 72.U
+      }
+      .elsewhen(counter === 10.U){
+        dataPtr := 256.U
+      }
+      .elsewhen(counter === 14.U){
+        dataPtr := (params.scratchpadEntries*8-1).U
+        teststate := s_stop_wait // head and tail should move together
+      }
+      .elsewhen(counter === 18.U){
+        dataPtr := (8-1).U
+        teststate := s_stop_wait // head and tail should move together
+      }
+      .elsewhen(~memoryctrlIO.storeData.ready){
+        teststate := s_write
+      }
+
+    }
+    .elsewhen(teststate === s_stop_wait){
+      when(memoryctrlIO.findMatchBegin){
+        teststate := s_nomatch
+      }
+    }
+    .elsewhen(teststate === s_write){
+      when(io.storeData.ready){
+        teststate := s_match
+        candidatePtr := 42.U
+        dataPtr := 71.U
+      }
+    }
+    .elsewhen(teststate === s_match){
+      matchCounter := matchCounter + 1.U
+      candidatePtr := candidatePtr + 1.U
+      dataPtr := dataPtr + 1.U
+      when(~equal){
+        teststate := s_done
+      }
+
+    }
+
+    scratchpadIO.write(1).en := (teststate === s_nomatch && counter < 128.U)
+    scratchpadIO.write(1).addr := counter
+    scratchpadIO.write(1).data := counter + 1.U
+    memoryctrlIO.storeData.bits := counter + 1.U
+    memoryctrlIO.storeData.vaild := (teststate === s_nomatch && counter < 128.U)
+    matchFound := (matchCounter === 0.U)
+    equal := (matchCounter < 128.U)
+  // ------------------------------------------------------------
+
+
   // initialize each operation
   when(cmd.fire()) {
     when(doSetLength) {
@@ -277,6 +373,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     }.elsewhen(doCompress) {
       minScratchpadAddress := cmd.bits.rs1
       maxScratchpadAddress := cmd.bits.rs1
+      minWriteAddress := cmd.bits.rs2
       //TODO: some of the signals are redundant
       busy := true.B
       op := cmd.bits.rs2

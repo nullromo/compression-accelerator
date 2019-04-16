@@ -75,6 +75,10 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
         endLoad := (maxLDvAddr >= (io.readBaseAddr + io.length))
         outOfRange := (io.dataPtr.bits === (tailLDp * dataBytes.U - 1.U))
 
+        // min virtual address
+        minvAddr := minLDvAddr
+        maxvAddr := maxLDvAddr
+
         // full logic
         fullLD := ~(headLDp === tailLDp)
         fullSW := ~(headSWp === tailSWp)
@@ -98,7 +102,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
 
         // connect the rest of the output
         io.readScratchpadReady := ~emptyLD && (stateWork > s_fill) && ~outOfRange
-        io.findMatchBegin := (~outOfRange || (stateDMA === s_dma_write)) && (stateWork > s_fill)
+        io.findMatchBegin := (~(outOfRange || (stateDMA === s_dma_write))) && (stateWork > s_fill)
 
         when(stateWork === s_idle){
             when(io.busy){
