@@ -305,38 +305,38 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
  	scratchpadIO.dma <> memoryctrlIO.dma
 
     when(teststate === s_idle){
-      when(memoryctrlIO.readScratchpadReady === true.B){
-        teststate := s_nomatch
-      }
+        when(memoryctrlIO.readScratchpadReady === true.B){
+            teststate := s_nomatch
+        }
     }
     .elsewhen(teststate === s_nomatch){
-      counter := counter + 1.U
-      when(counter === 2.U){
-        dataPtr := 2.U
-      }
-      .elsewhen(counter === 6.U){
-        dataPtr := 72.U
-      }
-      .elsewhen(counter === 10.U){
-        dataPtr := 256.U
-      }
-      .elsewhen(counter === 14.U){
-        dataPtr := (params.scratchpadEntries*8-1).U
-        teststate := s_stop_wait // head and tail should move together
-      }
-      .elsewhen(counter === 18.U){
-        dataPtr := (8-1).U
-        teststate := s_stop_wait // head and tail should move together
-      }
-      .elsewhen(~memoryctrlIO.storeData.ready){
-        teststate := s_write
-      }
+        counter := counter + 1.U
+        when(counter === 2.U){
+            dataPtr := 2.U
+        }
+        .elsewhen(counter === 6.U){
+            dataPtr := 72.U
+        }
+        .elsewhen(counter === 10.U){
+            dataPtr := 256.U
+        }
+        .elsewhen(counter === 14.U){
+            dataPtr := (params.scratchpadEntries*8-1).U
+            teststate := s_stop_wait // head and tail should move together
+        }
+        .elsewhen(counter === 18.U){
+            dataPtr := (8-1).U
+            teststate := s_stop_wait // head and tail should move together
+        }
+        .elsewhen(~memoryctrlIO.storeData.ready){
+            teststate := s_write
+        }
 
     }
     .elsewhen(teststate === s_stop_wait){
-      when(memoryctrlIO.findMatchBegin){
-        teststate := s_nomatch
-      }
+        when(memoryctrlIO.findMatchBegin){
+            teststate := s_nomatch
+        }
     }
     .elsewhen(teststate === s_write){
       when(memoryctrlIO.storeData.ready){
@@ -370,24 +370,24 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   // initialize each operation
   when(cmd.fire()) {
     when(doSetLength) {
-      length := cmd.bits.rs1
+        length := cmd.bits.rs1
     }.elsewhen(doCompress) {
-      minScratchpadAddress := cmd.bits.rs1
-      maxScratchpadAddress := cmd.bits.rs1
-      minWriteAddress := cmd.bits.rs2
-      //TODO: some of the signals are redundant
-      busy := true.B
-      op := cmd.bits.rs2
-      src := cmd.bits.rs1
-      dst := cmd.bits.rs2
-      ip_end := cmd.bits.rs1 + length
-      base_ip := cmd.bits.rs1
-      next_emit := cmd.bits.rs1
-      ip_limit := cmd.bits.rs1 + length - kInputMarginBytes
-      ip := cmd.bits.rs1 + 1.U
+        minScratchpadAddress := cmd.bits.rs1
+        maxScratchpadAddress := cmd.bits.rs1
+        minWriteAddress := cmd.bits.rs2
+        //TODO: some of the signals are redundant
+        busy := true.B
+        op := cmd.bits.rs2
+        src := cmd.bits.rs1
+        dst := cmd.bits.rs2
+        ip_end := cmd.bits.rs1 + length
+        base_ip := cmd.bits.rs1
+        next_emit := cmd.bits.rs1
+        ip_limit := cmd.bits.rs1 + length - kInputMarginBytes
+        ip := cmd.bits.rs1 + 1.U
     }.elsewhen(doUncompress) {
-      busy := true.B
-      // ...
+        busy := true.B
+        // ...
     }
   }
 
