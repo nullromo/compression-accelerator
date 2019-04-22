@@ -65,7 +65,7 @@ class CompressionAcceleratorTester(c: ScratchpadTestModule) extends PeekPokeTest
     poke(c.io.cmd.bits.rs2, 0x1000) // dst = 100
     step(1)
     poke(c.io.cmd.valid, false)
-    step(4000)
+    step(5000)
 	//  expect(peek(c.io.interrupt) != 277, "I should have passed ;(")
 
 }

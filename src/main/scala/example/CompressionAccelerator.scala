@@ -291,8 +291,8 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 	}
   */
 	// -------------- Test Memory Controller ----------------------
-    val counter = RegInit(0.U(7.W))
-    val matchCounter = RegInit(0.U(7.W))
+    val counter = RegInit(0.U(8.W))
+    val matchCounter = RegInit(0.U(8.W))
     memoryctrlIO.readBaseAddr := minScratchpadAddress
     memoryctrlIO.writeBaseAddr := minWriteAddress
     memoryctrlIO.length := length
@@ -343,9 +343,11 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
         teststate := s_match
         candidatePtr := 42.U
         dataPtr := 71.U
+		counter := 0.U
       }
     }
     .elsewhen(teststate === s_match){
+	  counter := counter + 1.U
       matchCounter := matchCounter + 1.U
       candidatePtr := candidatePtr + 1.U
       dataPtr := dataPtr + 1.U
@@ -355,13 +357,13 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 
     }
 
-    scratchpadIO.write(1).en := (teststate === s_nomatch && counter < 128.U)
-    scratchpadIO.write(1).addr := counter
+    scratchpadIO.write(1).en := (teststate === s_nomatch && memoryctrlIO.storeData.ready) || (teststate === s_match && memoryctrlIO.storeData.ready)
+    scratchpadIO.write(1).addr := memoryctrlIO.storeSpAddr
     scratchpadIO.write(1).data := counter + 1.U
     memoryctrlIO.storeData.bits := counter + 1.U
-    memoryctrlIO.storeData.valid := (teststate === s_nomatch && counter < 128.U)
+    memoryctrlIO.storeData.valid := (teststate === s_nomatch && memoryctrlIO.storeData.ready) || (teststate === s_match && memoryctrlIO.storeData.ready)
     matchFound := (matchCounter === 0.U && teststate === s_match)
-    equal := (matchCounter < 128.U && teststate === s_match)
+    equal := (matchCounter < 200.U && teststate === s_match)
   // ------------------------------------------------------------
 
 

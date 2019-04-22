@@ -28,7 +28,7 @@ class MemoryControllerIO(val nRows: Int, val dataBytes: Int)(implicit p: Paramet
 
     // -- Output
     val readScratchpadReady = Output(Bool())                // whether scratchpad is ready to be read
-    //val writeScratchpadReady = Output(Bool())               // whether scratchpad is ready to be written
+	val storeSpAddr = Output(UInt(log2Ceil(nRows).W))
     val findMatchBegin = Output(Bool())                     // whether datapath can run matching
     val minvAddr = Output(UInt(coreMaxAddrBits.W))          // the minimum data (load) virtual address in the scratchpad
     val maxvAddr = Output(UInt(coreMaxAddrBits.W))          // the maximum data (load) virtual address in the scratchpad
@@ -79,6 +79,9 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
         io.minvAddr := minLDvAddr
         io.maxvAddr := maxLDvAddr
 
+		// next compressed data Address needs to be stored in the scratchpad
+		io.storeSpAddr := tailSWp
+
         // full logic
         fullLD := (headLDp === tailLDp)
         fullSW := (headSWp === tailSWp)
@@ -87,6 +90,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
         // -- because each dma store needs to store all data in store scratchpad, tail should not move during write tp L2$
         when(io.storeData.fire()){
             tailSWp := tailSWp + 1.U
+			emptySW := false.B
         }
         io.storeData.ready := ~(fullSW || (stateDMA === s_dma_write))
 
@@ -95,10 +99,10 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
         // -- When loading data, virtual address should be maxLDvAddr, spaddress should be tail ptr, and bank is 0
         // -- When writing data, virtual address should be maxSWvAddr, spaddress should be tail ptr, and bank is 1
         io.dma.req.bits.vaddr := Mux(stateDMA === s_dma_read, maxLDvAddr, maxSWvAddr)
-        io.dma.req.bits.spaddr := Mux(stateDMA === s_dma_read, tailLDp, tailSWp)
+        io.dma.req.bits.spaddr := Mux(stateDMA === s_dma_read, tailLDp, headSWp)
         io.dma.req.bits.spbank := Mux(stateDMA === s_dma_read, 0.U, 1.U)
         io.dma.req.bits.write := stateDMA === s_dma_write
-        io.dma.req.valid := ((stateDMA === s_dma_read && ~fullLD) || (stateDMA === s_dma_write && ~emptySW))
+        io.dma.req.valid := ((stateDMA === s_dma_read && ~fullLD && ~fullSW) || (stateDMA === s_dma_write && ~emptySW))
         io.dma.resp.ready := true.B
 
         // connect the rest of the output
@@ -152,6 +156,11 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
                 stateWork := s_working
             }
 
+            // case 3: when store scratchpad is full or encode ends
+            when((fullSW || io.endEncode) && io.dma.req.ready){
+                stateWork := s_write
+            }
+
             // case 1: when a match is found
             //       -- move the head of LDp to candidate ptr line (assume that is the data is not consumed, in_ptr won't move)
             //       -- update minLDvAddr
@@ -168,11 +177,6 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
                 headLDp := headLDp + 1.U
                 minLDvAddr := minLDvAddr + dataBytes.U
             }
-
-            // case 3: when store scratchpad is full or encode ends
-            when((fullSW || io.endEncode) && io.dma.req.ready){
-                stateWork := s_write
-            }
         }
         .elsewhen(stateWork === s_write){
             when(io.dma.resp.valid){
@@ -185,7 +189,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
                     }.otherwise{
                         headSWp := headSWp + 1.U
                     }
-                    minSWvAddr := minSWvAddr + dataBytes.U
+                    maxSWvAddr := maxSWvAddr + dataBytes.U
                 }
             }
 
@@ -234,9 +238,12 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
             .elsewhen(emptySW && io.endEncode && io.dma.req.ready){
                 stateDMA := s_done
             }
-            .elsewhen(emptySW && ~fullLD && io.dma.req.ready){
+            .elsewhen(emptySW && ~fullLD && ~endLoad && io.dma.req.ready){
                 stateDMA := s_dma_read
             }
+			.elsewhen(emptySW && endLoad && io.dma.req.ready){
+				stateDMA := s_dma_wait
+			}
         }
         .elsewhen(stateDMA === s_done){
             when(~io.busy){
