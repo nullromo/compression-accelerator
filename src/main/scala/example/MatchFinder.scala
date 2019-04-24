@@ -22,7 +22,7 @@ class MatchFinderIO(dataWidth: Int, addressWidth: Int) extends Bundle {
   // ready/valid IO for scratchpad data
   val newCandidateData = Flipped(Decoupled(UInt(dataWidth.W)))
   // global base pointer connection
-  val globalBase = Input(UInt(addressWidth.W))
+  val src = Input(UInt(addressWidth.W))
   // reset the hash table
   val clear = Input(Bool())
 
@@ -48,9 +48,12 @@ class MatchFinder(dataWidth: Int, addressWidth: Int, hashTableSize: Int) extends
   io.newCandidateData.ready := true.B
 
   // when start looking, save the base pointer and set the state to looking
-  when(io.start.fire() && !looking) {
+  when(io.start.fire()) {
     looking := true.B
     matchPointer := io.start.bits
+  }.otherwise {
+    // advance the searching pointer
+    matchPointer := matchPointer + 1.U
   }
 
   // we want to read the scratchpad at the matchPointer location
@@ -67,7 +70,7 @@ class MatchFinder(dataWidth: Int, addressWidth: Int, hashTableSize: Int) extends
 
   // update the hash table with the new data and the offset of the new data
   hashTable.io.newData := io.newCandidateData.bits
-  hashTable.io.newOffset := matchPointer - io.globalBase
+  hashTable.io.newOffset := matchPointer - io.src
 
   // true when a match has been found
   val matchFound: Bool = Wire(Bool())
@@ -80,11 +83,6 @@ class MatchFinder(dataWidth: Int, addressWidth: Int, hashTableSize: Int) extends
   // only write to the hash table when we are looking or starting to look
   hashTable.io.enable := io.newCandidateData.valid && (looking || io.start.fire())
 
-  // advance the searching pointer while looking for a match
-  when(looking && !matchFound) {
-    matchPointer := matchPointer + 1.U
-  }
-
   // we have valid output when we are still in the looking state and there is a match
   io.out.valid := looking && matchFound
 
@@ -94,7 +92,7 @@ class MatchFinder(dataWidth: Int, addressWidth: Int, hashTableSize: Int) extends
   }
 
   // the beginning of the found match is the old offset for this data (the last location that held the same data)
-  io.out.bits.matchA := hashTable.io.oldOffset + io.globalBase
+  io.out.bits.matchA := hashTable.io.oldOffset + io.src
 
   // the end of the found match is the place we are looking at
   io.out.bits.matchB := matchPointer
@@ -115,7 +113,7 @@ class MatchFinderTestModule(memDataWidth: Int, dataWidth: Int, addressWidth: Int
   loadMemoryFromFile(mem, "data/alignerTestData.txt")
 
   // create memory aligner adapter
-  //TODO: this shouldn't depend on the memory aligner... it doens't matter that much though as long as things work
+  //TODO: this shouldn't depend on the memory aligner... it doesn't matter that much though as long as things work
   val aligner = Module(new MemoryReadAligner(
     32, 32, 32, 64
   ))
@@ -132,7 +130,7 @@ class MatchFinderTestModule(memDataWidth: Int, dataWidth: Int, addressWidth: Int
   io.out <> matchFinder.io.out
   io.memoryReadAddress <> DontCare
   io.newCandidateData <> DontCare
-  matchFinder.io.globalBase := io.globalBase
+  matchFinder.io.src := io.src
 
   dontTouch(aligner.io)
   dontTouch(matchFinder.io)

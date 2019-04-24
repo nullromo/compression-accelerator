@@ -14,7 +14,7 @@ class MatchFinderTester(c: MatchFinderTestModule) extends PeekPokeTester(c) {
   poke(c.io.start.valid, true)
 
   // set global base
-  poke(c.io.globalBase, 0)
+  poke(c.io.src, 0)
 
   // keep track of pointers
   var base: BigInt = 0
@@ -28,6 +28,10 @@ class MatchFinderTester(c: MatchFinderTestModule) extends PeekPokeTester(c) {
 
     // send in the input
     poke(c.io.start.bits, base)
+    if(cycles % 100 == 0)
+      poke(c.io.start.valid, true)
+    else
+    poke(c.io.start.valid, false)
 
     // if the output is valid, deal with it
     if (peek(c.io.out.valid) != 0) {

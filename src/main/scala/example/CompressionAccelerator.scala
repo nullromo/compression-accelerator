@@ -79,47 +79,62 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 
 
 
-  // adapter to read the scratchpad byte-by-byte in 32-bit chunks
-  val aligner = Module(new MemoryReadAligner(
+  // adapters to read the scratchpad byte-by-byte in 32-bit chunks
+  val alignerA = Module(new MemoryReadAligner(
+    32, 32, 32, 64
+  ))
+  val alignerB = Module(new MemoryReadAligner(
     32, 32, 32, 64
   ))
 
-  // connect the aligner to the memory
-  scratchpadIO.read(0)(0).addr := aligner.io.memIO.address
-  aligner.io.memIO.data := scratchpadIO.read(0)(0).data
+  // connect the aligners to the memory
+  scratchpadIO.read(0)(0).addr := alignerA.io.memIO.address
+  scratchpadIO.read(0)(1).addr := alignerB.io.memIO.address
+  alignerA.io.memIO.data := scratchpadIO.read(0)(0).data
+  alignerB.io.memIO.data := scratchpadIO.read(0)(1).data
 
-  // addresses sent to the aligner are always valid, but the aligner may choose not to be ready
-  aligner.io.readIO.address.valid := true.B
+  // addresses sent to the aligners are always valid, but the aligners may choose not to be ready
+  alignerA.io.readIO.address.valid := true.B
+  alignerB.io.readIO.address.valid := true.B
 
-  // the memory is always ready to be used by the aligner, but the aligner may not always be valid
-  aligner.io.readIO.data.ready := true.B
-
-  // tells the match finder where to begin a sequence
-  val matchSearchAddress = RegInit(0.U(32.W))
-
-  // pointer to tell the match finder where to start looking
-  val basePointer = RegInit(0.U(32.W))
+  // the memory is always ready to be used by the aligners, but the aligners may not always be valid
+  alignerA.io.readIO.data.ready := true.B
+  alignerB.io.readIO.data.ready := true.B
 
   // scans the scratchpad for matches
   val matchFinder = Module(new MatchFinder(params.scratchpadWidth, 32, params.hashTableSize))
 
   // pass in the global src pointer
-  matchFinder.io.globalBase := src
+  matchFinder.io.src := src
+
+  // start looking for matches at matchB
+  matchFinder.io.start.bits := matchB
+
+  // connect the matchFinder to the scratchpad
+  matchFinder.io.newCandidateData <> alignerB.io.readIO.data
+  alignerB.io.readIO.address <> matchFinder.io.memoryReadAddress
+
+
+  // instantiate the module that does the copy length check
+  val copyEmitter = Module(new CopyCompress(new CopyCompressParams{val parallellane = 1}))
+
+  // send the comparison data into the copyEmitter
+  copyEmitter.io.candidate := alignerA.io.readIO.data.asTypeOf(Vec(4, UInt(8.W)))
+  copyEmitter.io.data := alignerB.io.readIO.data.asTypeOf(Vec(4, UInt(8.W)))
 
   //
-  matchFinder.io.start.bits := matchSearchAddress
+  alignerA.io.readIO.address := matchA
 
-  matchFinder.io.newCandidateData <> aligner.io.readIO.data
-  aligner.io.readIO.address <> matchFinder.io.memoryReadAddress
-
+  /**
+    * Start main controller work
+    */
 
 
   matchFinder.io.start.valid := ???
+  matchFinder.io.clear := false.B
 
-
-
-
-
+  // output pointer
+  val scratchpadWriteAddress = RegInit(0.U(32.W))
 
   // keep track of the range that the scratchpad contains
   val minScratchpadAddress = RegInit(0.U(32.W))
@@ -128,15 +143,40 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   // everything between src and nextEmit has been accounted for in the output
   val nextEmit = RegInit(0.U(32.W))
 
-  //
+  // two pointers for the matches
+  val matchA = RegInit(0.U(32.W))
+  val matchB = RegInit(0.U(32.W))
 
   memoryctrlIO.readBaseAddr := src
   memoryctrlIO.writeBaseAddr := dst
   memoryctrlIO.length := length
   memoryctrlIO.busy := busy
+  memoryctrlIO.matchA := matchA
+  memoryctrlIO.matchB := matchB
+  memoryctrlIO.nextEmit := nextEmit
+  memoryctrlIO.emitEmptyBytePos := ???
+
+  // when stream is true, bytes read from the read bank will be sent into the write bank
+  val stream = RegInit(true.B)
+
+  // stream searched bytes through to the write bank
+  when(stream) {
+    scratchpadIO.write(1).en := true.B
+    scratchpadIO.write(1).data := scratchpadIO.read(0)(0).data
+  }
+
+  // when a match is found, stop sending literal bytes to the output
+  when(matchFinder.io.out.valid) {
+    stream := false.B
+  }.otherwise {
+
+  }
 
 
 
+  /**
+    * End main controller work
+    */
 
 
 
@@ -150,8 +190,13 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     when(doSetLength) {
         length := cmd.bits.rs1
     }.elsewhen(doCompress) {
+        matchFinder.io.clear := true.B
         minScratchpadAddress := cmd.bits.rs1
         maxScratchpadAddress := cmd.bits.rs1
+        nextEmit := cmd.bits.rs1
+        matchA := cmd.bits.rs1
+        matchB := cmd.bits.rs1 + 1.U
+        matchFinder.io.start.valid := true.B
         busy := true.B
         src := cmd.bits.rs1
         dst := cmd.bits.rs2
