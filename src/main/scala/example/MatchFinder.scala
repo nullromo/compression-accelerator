@@ -6,18 +6,19 @@ import chisel3.util.Decoupled
 import chisel3.util.experimental.loadMemoryFromFile
 
 class MatchFinderIO(dataWidth: Int, addressWidth: Int) extends Bundle {
-    //ready/valid IO for producing the output
-    val matchA = Decoupled(UInt(addressWidth.W))
     // ready/valid IO for accepting the starting arguments
-    val start = Flipped(Decoupled(UInt(addressWidth.W)))
-    // ready/valid IO for scratchpad address
+    //TODO: start probably doesn't have to be decoupled
+    val start = Flipped(Decoupled(Bool()))
+    // continuous IO for the matchB pointer
     val matchB = Input(UInt(addressWidth.W))
     // ready/valid IO for scratchpad data
-    val newCandidateData = Flipped(Decoupled(UInt(dataWidth.W)))
+    val newData = Flipped(Decoupled(UInt(dataWidth.W)))
     // global base pointer connection
     val src = Input(UInt(addressWidth.W))
     // reset the hash table
     val clear = Input(Bool())
+    //ready/valid IO for producing the output
+    val matchA = Decoupled(UInt(addressWidth.W))
 
     override def cloneType: this.type = new MatchFinderIO(dataWidth, addressWidth).asInstanceOf[this.type]
 }
@@ -45,7 +46,7 @@ class MatchFinder(dataWidth: Int, addressWidth: Int, hashTableSize: Int) extends
     io.start.ready := !looking
 
     // always ready to receive data from the memory
-    io.newCandidateData.ready := true.B
+    io.newData.ready := true.B
 
     // create the hash table
     val hashTable = Module(new HashTable(32, 16, hashTableSize))
@@ -54,19 +55,19 @@ class MatchFinder(dataWidth: Int, addressWidth: Int, hashTableSize: Int) extends
     hashTable.io.clearPresent := io.clear
 
     // update the hash table with the new data and the offset of the new data
-    hashTable.io.newData := io.newCandidateData.bits
+    hashTable.io.newData := io.newData.bits
     hashTable.io.newOffset := io.matchB - io.src
 
     // true when a match has been found
     val matchFound: Bool = Wire(Bool())
 
     matchFound := hashTable.io.oldPresent &&
-        (hashTable.io.oldData === io.newCandidateData.bits) &&
-        io.newCandidateData.valid &&
+        (hashTable.io.oldData === io.newData.bits) &&
+        io.newData.valid &&
         io.matchA.bits =/= io.matchB
 
     // only write to the hash table when we are looking or starting to look
-    hashTable.io.enable := io.newCandidateData.valid && (looking || io.start.fire())
+    hashTable.io.enable := io.newData.valid && (looking || io.start.fire())
 
     // we have valid output when we are still in the looking state and there is a match
     io.matchA.valid := looking && matchFound
@@ -101,12 +102,12 @@ class MatchFinderTestModule(memDataWidth: Int, dataWidth: Int, addressWidth: Int
     // connect the matchFinder to the read aligner
     aligner.io.readIO.address.bits := io.matchB
     aligner.io.readIO.address.valid := true.B
-    matchFinder.io.newCandidateData <> aligner.io.readIO.data
+    matchFinder.io.newData <> aligner.io.readIO.data
 
     // pass the rest of the IO through
     matchFinder.io.start <> io.start
     io.matchA <> matchFinder.io.matchA
-    io.newCandidateData <> DontCare
+    io.newData <> DontCare
     matchFinder.io.src := io.src
     matchFinder.io.matchB := io.matchB
 
