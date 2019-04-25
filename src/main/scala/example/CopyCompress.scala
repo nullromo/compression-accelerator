@@ -10,6 +10,9 @@ trait CopyCompressParams {
     val parallellane: Int
 }
 
+// if the tag is 1, then only the first 16 bits of copy are valid
+// if the tag is 2, then only the first 24 bits of copy are valid
+// if the tag is 3, then all 40            bits of copy are valid
 class CopyCompressedBundle extends Bundle {
     val copy = Output(UInt(40.W))
     val tag = Output(UInt(2.W))
@@ -207,7 +210,8 @@ class CopyStreamFormer(params: CopyCompressParams) extends Module {
 
         //default value
         io.copyCompressed.valid := false.B
-        io.copyCompressed.bits := 0.U
+        io.copyCompressed.bits.copy := 0.U
+        io.copyCompressed.bits.tag := 0.U
 
         // hope it is little endian format
         when((copyOffset < pow(2, 11).toInt.U) && (length >= 4.U) && (length <= 11.U)) {
@@ -234,6 +238,9 @@ class CopyStreamFormer(params: CopyCompressParams) extends Module {
                     ((copyOffset & 0x000000FFL.U) << 24).asUInt() |
                     (3.U << 32).asUInt() |
                     ((length - 1.U) << 34).asUInt()
+                printf("I am here, %x\n", copyOffset)
+                printf("I am here again, %x\n", length)
+                printf("I also am here %x\n", io.copyCompressed.bits.copy)
             }
 
         when(io.copyCompressed.ready) {
@@ -242,7 +249,8 @@ class CopyStreamFormer(params: CopyCompressParams) extends Module {
     }
         .otherwise {
             io.copyCompressed.valid := false.B
-            io.copyCompressed.bits := 0.U
+            io.copyCompressed.bits.copy := 0.U
+            io.copyCompressed.bits.tag := 0.U
         }
 
     io.start.ready := !start_reg

@@ -139,13 +139,13 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
    * Copy emitter
    */
   // instantiate the module that does the copy length check
-  val copyEmitter = Module(new CopyCompress(new CopyCompressParams{val parallellane = 1}))
+  val copyEmitter = Module(new CopyCompress(new CopyCompressParams{val parallellane = 4}))
   // send the comparison data into the copyEmitter
   copyEmitter.io.candidate := alignerA.io.readIO.data.asTypeOf(Vec(4, UInt(8.W)))
   copyEmitter.io.data := alignerB.io.readIO.data.asTypeOf(Vec(4, UInt(8.W)))
   copyEmitter.io.offset := matchB - matchA
 
-  
+
 
 
 
@@ -164,15 +164,11 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   // stream searched bytes through to the write bank
   when(stream) {
     scratchpadIO.write(1).en := true.B
-    scratchpadIO.write(1).data := scratchpadIO.read(0)(0).data
   }
 
-  // when a match is found, stop sending literal bytes to the output
-//  when(matchFinder.io.out.valid) {
-//    stream := false.B
-//  }.otherwise {
-//
-//  }
+    //TODO: when do we use which output?
+  //TODO: deal with copyCompressed.bits.tag
+    scratchpadIO.write(1).data := Mux(???, alignerB.io.readIO.data, copyEmitter.io.copyCompressed.bits.copy)
 
 
 
