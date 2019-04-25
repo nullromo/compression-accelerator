@@ -238,10 +238,11 @@ class CopyStreamFormer(params: CopyCompressParams) extends Module {
                     ((copyOffset & 0x000000FFL.U) << 24).asUInt() |
                     (3.U << 32).asUInt() |
                     ((length - 1.U) << 34).asUInt()
-                printf("I am here, %x\n", copyOffset)
-                printf("I am here again, %x\n", length)
-                printf("I also am here %x\n", io.copyCompressed.bits.copy)
             }
+
+        printf("I am here, %x\n", copyOffset)
+        printf("I am here again, %x\n", length)
+        printf("I also am here %x\n", io.copyCompressed.bits.copy)
 
         when(io.copyCompressed.ready) {
             start_reg := false.B
