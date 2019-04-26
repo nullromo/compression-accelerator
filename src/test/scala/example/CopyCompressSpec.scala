@@ -33,7 +33,7 @@ class CopyCompressSpec extends FlatSpec with Matchers {
 
     val maxOneByteOffset: Int = pow(2, 11).toInt
 
-    for (testcaseNum <- 0 until 1) {
+    for (testcaseNum <- 0 until 100) {
 
         // Save data into files
         //val writeFile_oneByte_candidate = new PrintWriter(new File("src/test/resources/oneByte/candidate/Testcase_" + testcaseNum + ".csv"))

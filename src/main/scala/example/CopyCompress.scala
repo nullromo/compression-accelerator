@@ -199,12 +199,21 @@ class CopyStreamFormer(params: CopyCompressParams) extends Module {
     val start_reg = RegInit(false.B)
     val length = RegInit(0.U(6.W))
     val copyOffset = RegInit(0.U(32.W))
+	val copy_inter = Wire(Vec(5, UInt(40.W)))
+	dontTouch(copy_inter)
 
     when(io.start.bits) {
         start_reg := true.B
         length := io.lengthAccum
         copyOffset := io.offset.bits
     }
+
+	copy_inter(0) := ((copyOffset & 0xFF000000L.U) >> 24)
+	copy_inter(1) := ((copyOffset & 0x00FF0000L.U) >> 8)  
+	copy_inter(2) := ((copyOffset & 0x0000FF00L.U) << 8) 
+	copy_inter(3) := ((copyOffset & 0x000000FFL.U) << 24)
+	copy_inter(4) := (3.U << 32) | ((length) << 34)
+
 
     when(start_reg) {
 
@@ -232,12 +241,12 @@ class CopyStreamFormer(params: CopyCompressParams) extends Module {
             .otherwise {
                 io.copyCompressed.bits.tag := 0x3.U
                 io.copyCompressed.valid := true.B
-                io.copyCompressed.bits.copy := ((copyOffset & 0xFF000000L.U) >> 24).asUInt() |
-                    ((copyOffset & 0x00FF0000L.U) >> 8).asUInt() |
-                    ((copyOffset & 0x0000FF00L.U) << 8).asUInt() |
-                    ((copyOffset & 0x000000FFL.U) << 24).asUInt() |
-                    (3.U << 32).asUInt() |
-                    ((length - 1.U) << 34).asUInt()
+                io.copyCompressed.bits.copy := ((copyOffset & 0xFF000000L.U) >> 24) |
+                    ((copyOffset & 0x00FF0000L.U) >> 8) |
+                    ((copyOffset & 0x0000FF00L.U) << 8) |
+                    ((copyOffset & 0x000000FFL.U) << 24) |
+                    (3.U << 32) |
+                    (((length - 1.U) & 0xFFFFFFFFL.U) << 34)
             }
 
         printf("I am here, %x\n", copyOffset)
