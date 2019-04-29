@@ -30,6 +30,7 @@ class CopyCompressIO(params: CopyCompressParams) extends Bundle {
     val hit = Input(Bool()) // tell the datapath to start compress
     val bufferPtrInc = Decoupled(UInt(log2Ceil(params.parallellane + 1).W))
     val remain = Input(UInt(64.W)) // remaining byte number needs to be compressed
+    val copyBusy = Output(Bool()) // indicator whether the copy path is working 
 
     override def cloneType: this.type = CopyCompressIO(params).asInstanceOf[this.type]
 }
@@ -72,6 +73,7 @@ class CopyCompress(val params: CopyCompressParams) extends Module {
     compareResult_uint := compareResult.asUInt
     equal_reg := io.equal
     equal_reg_prev := equal_reg
+    io.copyBusy := start_reg
 
 
     when(io.hit) {
