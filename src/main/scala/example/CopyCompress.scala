@@ -56,6 +56,7 @@ class CopyCompress(val params: CopyCompressParams) extends Module {
     val compareResult_uint: UInt = Wire(UInt(params.parallellane.W))
     val equal_reg = Reg(Bool())
     val equal_reg_prev = Reg(Bool())
+    val copybusyReg = RegInit(false.B)
     dontTouch(compareResult)
     dontTouch(compareResult_uint)
     dontTouch(num_candidate_valid)
@@ -73,18 +74,23 @@ class CopyCompress(val params: CopyCompressParams) extends Module {
     compareResult_uint := compareResult.asUInt
     equal_reg := io.equal
     equal_reg_prev := equal_reg
-    io.copyBusy := start_reg
+    io.copyBusy := copybusyReg
 
 
     when(io.hit) {
         start_reg := true.B
         lengthAccum := 4.U
         equal_reg := true.B
+        copybusyReg := true.B
         equal_reg_prev := true.B
     }
-        .elsewhen(!io.equal) {
-            start_reg := false.B
-        }
+    .elsewhen(!io.equal) {
+        start_reg := false.B
+    }
+
+    when(copybusyReg && copyStreamFormer.io.copyCompressed.fire){
+        copybusyReg := false.B
+    }
 
     (io.candidate zip candidate_valid).foreach { case (a, b) => b := a.valid.asUInt }
     (io.data zip data_valid).foreach { case (a, b) => b := a.valid.asUInt }
@@ -145,16 +151,16 @@ class CopyCompress(val params: CopyCompressParams) extends Module {
                 io.equal := false.B
             }
     }
-        .elsewhen(start_reg) {
-            io.equal := equal_reg //true.B
-            io.bufferPtrInc.bits := 0.U // default value
-            io.bufferPtrInc.valid := true.B
-        }
-        .otherwise {
-            io.equal := false.B
-            io.bufferPtrInc.bits := 0.U // default value
-            io.bufferPtrInc.valid := false.B
-        }
+    .elsewhen(start_reg) {
+        io.equal := equal_reg //true.B
+        io.bufferPtrInc.bits := 0.U // default value
+        io.bufferPtrInc.valid := true.B
+    }
+    .otherwise {
+        io.equal := false.B
+        io.bufferPtrInc.bits := 0.U // default value
+        io.bufferPtrInc.valid := false.B
+    }
 
     io.data.foreach { a => a.ready := true.B }
     io.candidate.foreach { a => a.ready := true.B }
@@ -201,20 +207,12 @@ class CopyStreamFormer(params: CopyCompressParams) extends Module {
     val start_reg = RegInit(false.B)
     val length = RegInit(0.U(6.W))
     val copyOffset = RegInit(0.U(32.W))
-	val copy_inter = Wire(Vec(5, UInt(40.W)))
-	dontTouch(copy_inter)
 
     when(io.start.bits) {
         start_reg := true.B
         length := io.lengthAccum
         copyOffset := io.offset.bits
     }
-
-	copy_inter(0) := ((copyOffset & 0xFF000000L.U) >> 24)
-	copy_inter(1) := ((copyOffset & 0x00FF0000L.U) >> 8)  
-	copy_inter(2) := ((copyOffset & 0x0000FF00L.U) << 8) 
-	copy_inter(3) := ((copyOffset & 0x000000FFL.U) << 24)
-	copy_inter(4) := (3.U << 32) | ((length) << 34)
 
 
     when(start_reg) {
@@ -232,38 +230,33 @@ class CopyStreamFormer(params: CopyCompressParams) extends Module {
                 ((length - 4.U) << 10).asUInt() |
                 ((copyOffset & 0x700.U) << 5).asUInt()
         }
-            .elsewhen(copyOffset < pow(2, 16).toInt.U) {
-                io.copyCompressed.bits.tag := 0x2.U
-                io.copyCompressed.valid := true.B
-                io.copyCompressed.bits.copy := ((copyOffset & 0xFF00.U) >> 8).asUInt() |
-                    ((copyOffset & 0x00FF.U) << 8).asUInt() |
-                    (2.U << 16).asUInt() |
-                    ((length - 1.U) << 18).asUInt()
-            }
-            .otherwise {
-                io.copyCompressed.bits.tag := 0x3.U
-                io.copyCompressed.valid := true.B
-                io.copyCompressed.bits.copy := ((copyOffset & 0xFF000000L.U) >> 24) |
-                    ((copyOffset & 0x00FF0000L.U) >> 8) |
-                    ((copyOffset & 0x0000FF00L.U) << 8) |
-                    ((copyOffset & 0x000000FFL.U) << 24) |
-                    (3.U << 32) |
-                    (((length - 1.U) & 0xFFFFFFFFL.U) << 34)
-            }
-
-        printf("I am here, %x\n", copyOffset)
-        printf("I am here again, %x\n", length)
-        printf("I also am here %x\n", io.copyCompressed.bits.copy)
-
+        .elsewhen(copyOffset < pow(2, 16).toInt.U) {
+            io.copyCompressed.bits.tag := 0x2.U
+            io.copyCompressed.valid := true.B
+            io.copyCompressed.bits.copy := ((copyOffset & 0xFF00.U) >> 8).asUInt() |
+                ((copyOffset & 0x00FF.U) << 8).asUInt() |
+                (2.U << 16).asUInt() |
+                ((length - 1.U) << 18).asUInt()
+        }
+        .otherwise {
+            io.copyCompressed.bits.tag := 0x3.U
+            io.copyCompressed.valid := true.B
+            io.copyCompressed.bits.copy := ((copyOffset & 0xFF000000L.U) >> 24) |
+                ((copyOffset & 0x00FF0000L.U) >> 8) |
+                ((copyOffset & 0x0000FF00L.U) << 8) |
+                ((copyOffset & 0x000000FFL.U) << 24) |
+                (3.U << 32) |
+                (((length - 1.U) & 0xFFFFFFFFL.U) << 34)
+        }
         when(io.copyCompressed.ready) {
             start_reg := false.B
         }
     }
-        .otherwise {
-            io.copyCompressed.valid := false.B
-            io.copyCompressed.bits.copy := 0.U
-            io.copyCompressed.bits.tag := 0.U
-        }
+    .otherwise {
+        io.copyCompressed.valid := false.B
+        io.copyCompressed.bits.copy := 0.U
+        io.copyCompressed.bits.tag := 0.U
+    }
 
     io.start.ready := !start_reg
     io.offset.ready := true.B

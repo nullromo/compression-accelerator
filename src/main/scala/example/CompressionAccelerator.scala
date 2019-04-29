@@ -72,12 +72,10 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 
     // valid match found
     val realMatchFound = Wire(Bool())
-
-
-
-
-
-
+    // remain logic
+    val remain = Wire(UInt(64.W))
+    // prev_copyBusy
+    val prev_copyBusy = RegInit(Bool())
 
 
     /*
@@ -90,9 +88,11 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     val maxScratchpadAddress = RegInit(0.U(32.W))
     // everything between src and nextEmit has been accounted for in the output
     val nextEmit = RegInit(0.U(32.W))
+    val nextEmitValid = RegInit(false.B)
     // two pointers for the matches
     val matchA = RegInit(0.U(32.W))
     val matchB = RegInit(0.U(32.W))
+    val offset = RegInit(0.U(32.W))
 
     /*
     * Read aligners
@@ -119,11 +119,16 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     alignerA.io.readIO.address.valid := true.B
     alignerB.io.readIO.address.valid := true.B
 
+    aligner.io.readDataIO.data.ready := matchFinder.io.newData.ready || copyEmitter.io.data.forall((a) => a.ready === true.B)
+
     /*
     * Match finder
     */
     // scans the scratchpad for matches
     val matchFinder = Module(new MatchFinder(params.scratchpadWidth, 32, params.hashTableSize))
+    // instantiate the module that does the copy length check
+    val copyEmitter = Module(new CopyCompress(new CopyCompressParams{val parallellane = 4}))
+
     // pass in the global src pointer
     matchFinder.io.src := src
     // pass in the global matchB pointer
@@ -131,34 +136,42 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     // clear the hash table when a new command is run
     matchFinder.io.clear := cmd.fire()
     // connect the matchFinder to the scratchpad, datawise
-    matchFinder.io.newData <> alignerB.io.readIO.data
-    // tell the matchFinder to start looking
-    //TODO: not sure this is necessary
-    matchFinder.io.start.valid := ???
+    // Match finder data valid is 1) when memory scratch pad is ready to read, 2) remain is large then 4, otherwise directly copy back
+    //                            3) alignerdata is valid
+    matchFinder.io.newData.valid := memoryctrlIO.readScratchpadReady && (remain >= 4.U) && aligner.io.readDataIO.data.valid
+    matchFinder.io.newData.bits := aligner.io.readDataIO.data.bits
+    // tell the matchFinder to start looking: when scratchpad is ready to read and copy emitter is just not busy
+    matchFinder.io.start.valid := memoryctrlIO.readScratchpadReady && (~copyEmitter.io.copyBusy || (copyEmitter.io.copyBusy && copyEmitter.io.copyCompressed.valid))
     matchFinder.io.start.bits := DontCare
 
     /*
     * Copy emitter
     */
-    // instantiate the module that does the copy length check
-    val copyEmitter = Module(new CopyCompress(new CopyCompressParams{val parallellane = 4}))
     // send the comparison data into the copyEmitter
-    copyEmitter.io.candidate := alignerA.io.readIO.data.asTypeOf(Vec(4, UInt(8.W)))
-    copyEmitter.io.data := alignerB.io.readIO.data.asTypeOf(Vec(4, UInt(8.W)))
-    copyEmitter.io.offset := matchB - matchA
+    copyEmitter.io.candidate := aligner.io.readCandidateIO.data.asTypeOf(Vec(4, UInt(8.W)))
+    copyEmitter.io.data := aligner.io.readDataIO.data.asTypeOf(Vec(4, UInt(8.W)))
+    copyEmitter.io.offset := offset
+    copyEmitter.io.valid := DontCare
+    copyEmitter.io.hit := realMatchFound
+    copyEmitter.io.remain := remain
 
-
-
-
-
+    /* 
+    * memory controller
+    */
     memoryctrlIO.readBaseAddr := src
     memoryctrlIO.writeBaseAddr := dst
     memoryctrlIO.length := length
     memoryctrlIO.busy := busy
     memoryctrlIO.matchA := matchB   // should be reverse matchB is matchA and matchA is match B
     memoryctrlIO.matchB := matchA
-    memoryctrlIO.nextEmit := nextEmit
-    memoryctrlIO.emitEmptyBytePos := ???
+    memoryctrlIO.nextEmit.bits := nextEmit
+    memoryctrlIO.nextEmit.valid := nextEmitValid
+    memoryctrlIO.emitEmptyBytePos := nextEmit
+    memoryctrlIO.emitEmptyBytePos.valid := nextEmitValid
+    memoryctrlIO.matchFound := matchFinder.io.matchA.valid
+    memoryctrlIO.equal := copyEmitter.io.equal
+    // -- encode end when : in literal mode, remain is 0; in copy mode, copy is not busy anymore
+    memoryctrlIO.endEncode := (remain === 0.U) && (~copyEmitter.io.copyBusy)
 
     // when stream is true, bytes read from the read bank will be sent into the write bank
     val stream = RegInit(true.B)
@@ -168,7 +181,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
         scratchpadIO.write(1).en := true.B
     }
 
-        //TODO: when do we use which output?
+    //TODO: when do we use which output?
     //TODO: deal with copyCompressed.bits.tag
         scratchpadIO.write(1).data := Mux(???, alignerB.io.readIO.data, copyEmitter.io.copyCompressed.bits.copy)
 
@@ -183,10 +196,11 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     // -- when finding copy, matchA should be increased the same way as dataPtr
 
     realMatchFound := matchFinder.io.matchA.valid && (matchFinder.io.matchA.bits >= scratchpadIO.minvAddr + 8.U)
+    prev_copyBusy := copyEmitter.io.copyBusy
 
     when(!copyEmitter.io.copyBusy) {
         when(matchFinder.io.newData.ready && !scratchpadIO.outOfRangeFlag){
-            when(!matchFinder.io.matchA.valid) {
+            when(!realMatchFound) {
                 matchB := matchB + 1.U // can be changed to skip later, also when match found, matchB should move + 4
             }
             .otherwise{
@@ -195,6 +209,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
         }
         when(realMatchFound) {
             matchA := matchFinder.io.matchA.bits + 4.U
+            offset := matchB - matchA // offset logic
         }
     }
     .otherwise{
@@ -203,6 +218,25 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
             matchA := matchA + copyEmitter.io.bufferIncPtr.bits
         }
     }
+
+    // ****** remain logic *******
+    remain = length - (matchB - minScratchpadAddress)
+
+    // ****** next emit logic ******
+    // -- nextEmit should be the matchB position when system just finish copy emitter
+    // -- nextEmit valid when the literal emmitter finsh current match found and store them back in to write bank
+    when(~copyEmitter.io.copyBusy && prev_copyBusy){
+        nextEmit := matchB
+        nextEmitValid := true.B
+    }
+
+    when(matchFinder.io.matchA.fire() && nextEmitValid){
+        nextEmitValid := false.B
+    }
+
+
+
+
 
 
 
@@ -216,6 +250,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
             minScratchpadAddress := cmd.bits.rs1
             maxScratchpadAddress := cmd.bits.rs1
             nextEmit := cmd.bits.rs1
+            nextEmitValid := true.B
             matchA := cmd.bits.rs1
             matchB := cmd.bits.rs1 + 1.U
             matchFinder.io.start.valid := true.B

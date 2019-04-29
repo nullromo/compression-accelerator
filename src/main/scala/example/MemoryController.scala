@@ -111,7 +111,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
         io.dma.resp.ready := true.B
 
         // connect the rest of the output
-        io.readScratchpadReady := ~emptyLD && (stateWork > s_fill) && ~outOfRange
+        io.readScratchpadReady := ~emptyLD && (stateWork > s_fill) && ~(outOfRange || (stateDMA === s_dma_write))
         io.findMatchBegin := (~(outOfRange || (stateDMA === s_dma_write))) && (stateWork > s_fill)
 
         // force emit literal when scratch pad 
