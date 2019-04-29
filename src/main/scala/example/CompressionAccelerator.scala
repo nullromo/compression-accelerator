@@ -131,9 +131,10 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   // connect the matchFinder to the scratchpad, datawise
   matchFinder.io.newData <> alignerB.io.readIO.data
   // tell the matchFinder to start looking
-  //TODO: not sure this is necessary
-  matchFinder.io.start.valid := ???
+  //TODO: not sure start is even necessary
+  matchFinder.io.start.valid := false.B //???
   matchFinder.io.start.bits := DontCare
+  matchFinder.io.matchA.ready := true.B //TODO: change this
 
   /*
    * Copy emitter
@@ -141,11 +142,19 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   // instantiate the module that does the copy length check
   val copyEmitter = Module(new CopyCompress(new CopyCompressParams{val parallellane = 4}))
   // send the comparison data into the copyEmitter
-  copyEmitter.io.candidate := alignerA.io.readIO.data.asTypeOf(Vec(4, UInt(8.W)))
-  copyEmitter.io.data := alignerB.io.readIO.data.asTypeOf(Vec(4, UInt(8.W)))
-  copyEmitter.io.offset := matchB - matchA
-
-
+  for(i <- 0 until 4) {
+    copyEmitter.io.candidate(i).bits := alignerA.io.readIO.data.bits.asTypeOf(Vec(4, UInt(8.W)))(i)
+    copyEmitter.io.data(i).bits := alignerB.io.readIO.data.bits.asTypeOf(Vec(4, UInt(8.W)))(i)
+    copyEmitter.io.candidate(i).valid := true.B //TODO: change this
+    copyEmitter.io.data(i).valid := true.B //TODO: change this
+  }
+  copyEmitter.io.offset.bits := matchB - matchA
+  copyEmitter.io.offset.valid := true.B //TODO: change this
+  // a match has been found when the matchFinder has valid output
+  copyEmitter.io.hit := matchFinder.io.matchA.valid
+  copyEmitter.io.bufferPtrInc.ready := true.B //TODO: what is this for?
+  copyEmitter.io.copyCompressed.ready := true.B //TODO: change this
+  copyEmitter.io.remain := length - (nextEmit - src)
 
 
 
@@ -155,8 +164,8 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
   memoryctrlIO.busy := busy
   memoryctrlIO.matchA := matchA
   memoryctrlIO.matchB := matchB
-  memoryctrlIO.nextEmit := nextEmit
-  memoryctrlIO.emitEmptyBytePos := ???
+  memoryctrlIO.nextEmit.bits := nextEmit //TODO: should this be decoupled?
+  memoryctrlIO.emitEmptyBytePos.bits := 0.U //TODO: what does this do?
 
   // when stream is true, bytes read from the read bank will be sent into the write bank
   val stream = RegInit(true.B)
@@ -168,7 +177,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 
     //TODO: when do we use which output?
   //TODO: deal with copyCompressed.bits.tag
-    scratchpadIO.write(1).data := Mux(???, alignerB.io.readIO.data, copyEmitter.io.copyCompressed.bits.copy)
+//    scratchpadIO.write(1).data := Mux(???, alignerB.io.readIO.data, copyEmitter.io.copyCompressed.bits.copy)
 
 
 

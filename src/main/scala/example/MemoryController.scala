@@ -76,7 +76,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
         val outOfRange = Wire(Bool())
 
         endLoad := (maxLDvAddr >= (io.readBaseAddr + io.length))
-//        outOfRange := (io.dataPtr.bits === ((tailLDp * dataBytes.U) - 1.U))
+        outOfRange := (io.matchB === ((tailLDp * dataBytes.U) - 1.U))
 
         // min virtual address
         io.minvAddr := minLDvAddr
@@ -170,10 +170,10 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
             // case 2: when no match found but load scratchpad is full and dataPtr reaches the end of the scratchpad
             //        -- move head first and then tail together
             //        -- request DMA
-//            when((io.dataPtr.bits  === ((tailLDp * dataBytes.U) - 1.U)) && fullLD){
-//                headLDp := headLDp + 1.U
-//                minLDvAddr := minLDvAddr + dataBytes.U
-//            }
+            when((io.matchB === ((tailLDp * dataBytes.U) - 1.U)) && fullLD){
+                headLDp := headLDp + 1.U
+                minLDvAddr := minLDvAddr + dataBytes.U
+            }
         }
         .elsewhen(stateWork === s_write){
             when(io.dma.resp.valid){
