@@ -17,7 +17,7 @@ class MemoryControllerIO(val nRows: Int, val dataBytes: Int)(implicit p: Paramet
     val length = Input(UInt(32.W))                          // Total data length to be compressed
     val busy = Input(Bool())                                // whether the compression begins
     val matchA = Input(UInt(log2Ceil(nRows*dataBytes).W))      // the next data byte that needs to be compressed (should be scratchpad address, not virtual address)
-    val matchB = Input(UInt(log2Ceil(nRows*dataBytes).W))      // candidate pointer
+    val matchB = Input(UInt(log2Ceil(nRows*dataBytes).W))      // candidate pointer seems no use
     val nextEmit = Flipped(Decoupled((UInt(log2Ceil(nRows*dataBytes).W))))    // next emit pointeral
     val emitEmptyBytePos = Flipped(Decoupled(UInt(log2Ceil(nRows*dataBytes).W))) // Literal emit empty byte position
 
@@ -35,6 +35,8 @@ class MemoryControllerIO(val nRows: Int, val dataBytes: Int)(implicit p: Paramet
     val minvAddr = Output(UInt(coreMaxAddrBits.W))          // the minimum data (load) virtual address in the scratchpad
     val maxvAddr = Output(UInt(coreMaxAddrBits.W))          // the maximum data (load) virtual address in the scratchpad
     val forceLiteral = Output(Bool())                       // scratchpad is full and no match found
+    val outOfRangeFlag = Output(Bool())                     // whether the current dataPtr is out of scratch pad range or not
+    val fullSW = Output(Bool())                             // whether the store bank is full or not
 
     // -- DMA arbiter port to Scratchpad
     val dma = new ScratchpadMemIO(2, nRows)                 // 2 banks: 0 -> load bank   1 -> store bank
@@ -47,7 +49,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
     // Real implementation
     lazy val module = new LazyModuleImp(this) with HasCoreParameters {
         val io = IO(new MemoryControllerIO(nRows, dataBytes))
-
+    
 
         // load head/tail ptrs
         val headLDp = RegInit(0.U(log2Ceil(nRows).W))
@@ -69,14 +71,15 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
 
         val (s_idle :: s_fill :: s_working :: s_write :: s_done ::
             s_dma_wait :: s_dma_read :: s_dma_write :: Nil) = Enum(8)
-        val stateWork = RegInit(s_idle) // determine head and tail
+        val stateWork = RegInit(s_idle) // determine head and tail 
         val stateDMA = RegInit(s_idle)  // determine dma read and write
 
         val endLoad = Wire(Bool())
         val outOfRange = Wire(Bool())
 
         endLoad := (maxLDvAddr >= (io.readBaseAddr + io.length))
-        outOfRange := (io.matchB === ((tailLDp * dataBytes.U) - 1.U))
+        outOfRange := (io.matchA.bits === (((tailLDp-1.U) * dataBytes.U) - 1.U)) // need at least two lines to make aligner working properly
+        io.outOfRangeFlag := outOfRange
 
         // min virtual address
         io.minvAddr := minLDvAddr
@@ -88,6 +91,8 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
         // full logic
         fullLD := (headLDp === tailLDp)
         fullSW := (headSWp === tailSWp)
+
+        io.fullSW := fullSW
 
         // store compressed data into scratchpad
         // -- because each dma store needs to store all data in store scratchpad, tail should not move during write tp L2$
@@ -109,10 +114,10 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
         io.dma.resp.ready := true.B
 
         // connect the rest of the output
-        io.readScratchpadReady := ~emptyLD && (stateWork > s_fill) && ~outOfRange
+        io.readScratchpadReady := ~emptyLD && (stateWork > s_fill) && ~(outOfRange || (stateDMA === s_dma_write))
         io.findMatchBegin := (~(outOfRange || (stateDMA === s_dma_write))) && (stateWork > s_fill)
 
-        // force emit literal when scratch pad
+        // force emit literal when scratch pad 
         io.forceLiteral := (headLDp === io.nextEmit.bits / dataBytes.U) && io.nextEmit.valid
 
         when(stateWork === s_idle){
@@ -170,7 +175,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
             // case 2: when no match found but load scratchpad is full and dataPtr reaches the end of the scratchpad
             //        -- move head first and then tail together
             //        -- request DMA
-            when((io.matchB === ((tailLDp * dataBytes.U) - 1.U)) && fullLD){
+            when((io.matchA.bits  === ((tailLDp * dataBytes.U) - 1.U)) && fullLD){
                 headLDp := headLDp + 1.U
                 minLDvAddr := minLDvAddr + dataBytes.U
             }
