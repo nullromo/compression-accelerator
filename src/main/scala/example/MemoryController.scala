@@ -30,7 +30,7 @@ class MemoryControllerIO(val nRows: Int, val dataBytes: Int)(implicit p: Paramet
 
     // -- Output
     val readScratchpadReady = Output(Bool())                // whether scratchpad is ready to be read or write
-	val storeSpAddr = Output(UInt(log2Ceil(nRows*dataBytes).W)) // The current store bank tail address
+	val storeSpAddr = Output(UInt(log2Ceil(nRows).W)) // The current store bank tail address
     val findMatchBegin = Output(Bool())                     // whether datapath can run matching
     val minvAddr = Output(UInt(coreMaxAddrBits.W))          // the minimum data (load) virtual address in the scratchpad
     val maxvAddr = Output(UInt(coreMaxAddrBits.W))          // the maximum data (load) virtual address in the scratchpad
@@ -86,7 +86,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
         io.maxvAddr := maxLDvAddr
 
 		// next compressed data Address needs to be stored in the scratchpad
-		io.storeSpAddr := tailSWp / dataBytes.U
+		io.storeSpAddr := tailSWp
 
         // full logic
         fullLD := (headLDp === tailLDp)
