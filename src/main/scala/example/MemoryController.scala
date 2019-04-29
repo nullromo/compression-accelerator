@@ -16,8 +16,8 @@ class MemoryControllerIO(val nRows: Int, val dataBytes: Int)(implicit p: Paramet
     val writeBaseAddr = Input(UInt(coreMaxAddrBits.W))      // compressed data save base address
     val length = Input(UInt(32.W))                          // Total data length to be compressed
     val busy = Input(Bool())                                // whether the compression begins
-    val matchA = Input(UInt(log2Ceil(nRows*dataBytes).W))      // the next data byte that needs to be compressed (should be scratchpad address, not virtual address)
-    val matchB = Input(UInt(log2Ceil(nRows*dataBytes).W))      // candidate pointer seems no use
+    val matchA = Input(UInt(log2Ceil(nRows*dataBytes).W))   // candidate pointer seems no use   
+    val matchB = Input(UInt(log2Ceil(nRows*dataBytes).W))   // the next data byte that needs to be compressed (should be scratchpad address, not virtual address)
     val nextEmit = Flipped(Decoupled((UInt(log2Ceil(nRows*dataBytes).W))))    // next emit pointeral
     val emitEmptyBytePos = Flipped(Decoupled(UInt(log2Ceil(nRows*dataBytes).W))) // Literal emit empty byte position
 
@@ -78,7 +78,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
         val outOfRange = Wire(Bool())
 
         endLoad := (maxLDvAddr >= (io.readBaseAddr + io.length))
-        outOfRange := (io.matchA.bits === (((tailLDp-1.U) * dataBytes.U) - 1.U)) // need at least two lines to make aligner working properly
+        outOfRange := (io.matchB === (((tailLDp-1.U) * dataBytes.U) - 1.U)) // need at least two lines to make aligner working properly
         io.outOfRangeFlag := outOfRange
 
         // min virtual address
@@ -175,7 +175,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
             // case 2: when no match found but load scratchpad is full and dataPtr reaches the end of the scratchpad
             //        -- move head first and then tail together
             //        -- request DMA
-            when((io.matchA.bits  === ((tailLDp * dataBytes.U) - 1.U)) && fullLD){
+            when((io.matchB  === ((tailLDp * dataBytes.U) - 1.U)) && fullLD){
                 headLDp := headLDp + 1.U
                 minLDvAddr := minLDvAddr + dataBytes.U
             }

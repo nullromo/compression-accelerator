@@ -162,8 +162,8 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     memoryctrlIO.writeBaseAddr := dst
     memoryctrlIO.length := length
     memoryctrlIO.busy := busy
-    memoryctrlIO.matchA := (matchB - src) % (params.scratchpadEntries * params.scratchpadWidth / 8).U  // should be reverse matchB is matchA and matchA is match B
-    memoryctrlIO.matchB := (matchA - src) % (params.scratchpadEntries * params.scratchpadWidth / 8).U
+    memoryctrlIO.matchB := (matchB - src) % (params.scratchpadEntries * params.scratchpadWidth / 8).U  // should be reverse matchB is matchA and matchA is match B
+    memoryctrlIO.matchA := (matchA - src) % (params.scratchpadEntries * params.scratchpadWidth / 8).U
     memoryctrlIO.nextEmit.bits := nextEmit
     memoryctrlIO.nextEmit.valid := nextEmitValid
     memoryctrlIO.emitEmptyBytePos := nextEmit // not correct should be recorded as write bank ptr
