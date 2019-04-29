@@ -35,7 +35,8 @@ class MemoryControllerIO(val nRows: Int, val dataBytes: Int)(implicit p: Paramet
     val minvAddr = Output(UInt(coreMaxAddrBits.W))          // the minimum data (load) virtual address in the scratchpad
     val maxvAddr = Output(UInt(coreMaxAddrBits.W))          // the maximum data (load) virtual address in the scratchpad
     val forceLiteral = Output(Bool())                       // scratchpad is full and no match found
-    val outOfRangeFlag = Output(Bool())                         // whether the current dataPtr is out of scratch pad range or not
+    val outOfRangeFlag = Output(Bool())                     // whether the current dataPtr is out of scratch pad range or not
+    val fullSW = Output(Bool())                             // whether the store bank is full or not
 
     // -- DMA arbiter port to Scratchpad
     val dma = new ScratchpadMemIO(2, nRows)                 // 2 banks: 0 -> load bank   1 -> store bank
@@ -90,6 +91,8 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
         // full logic
         fullLD := (headLDp === tailLDp)
         fullSW := (headSWp === tailSWp)
+
+        io.fullSW := fullSW
 
         // store compressed data into scratchpad
         // -- because each dma store needs to store all data in store scratchpad, tail should not move during write tp L2$
