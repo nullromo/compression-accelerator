@@ -76,6 +76,9 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     val remain = Wire(UInt(64.W))
     // prev_copyBusy
     val prev_copyBusy = RegInit(Bool())
+    // write bank mask
+    val mask = RegInit(0.U(64.W))
+    val streamcounter = RegInit(0.U(3.W))
 
 
     /*
@@ -98,28 +101,25 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     * Read aligners
     */
     // adapters to read the scratchpad byte-by-byte in 32-bit chunks
-    val alignerA = Module(new MemoryReadAligner(
-        32, 32, 32, 64
-    ))
-    val alignerB = Module(new MemoryReadAligner(
+    val aligner = Module(new MemoryReadAligner(
         32, 32, 32, 64
     ))
     // connect the aligners to the memory
-    scratchpadIO.read(0)(0).addr := alignerA.io.memIO.address
-    scratchpadIO.read(0)(1).addr := alignerB.io.memIO.address
-    alignerA.io.memIO.data := scratchpadIO.read(0)(0).data
-    alignerB.io.memIO.data := scratchpadIO.read(0)(1).data
+    scratchpadIO.read(0)(0).addr := (aligner.io.memDataIO.address - src) % (params.scratchpadEntries * params.scratchpadWidth / 8).U
+    scratchpadIO.read(0)(1).addr := (aligner.io.memCandidateIO.address - src) % (params.scratchpadEntries * params.scratchpadWidth / 8).U
+    scratchpadIO.read(0)(0).en := aligner.io.memDataIO.en
+    scratchpadIO.read(0)(1).en := aligner.io.memCandidateIO.en
+    aligner.io.memDataIO.data := scratchpadIO.read(0)(0).data
+    aligner.io.memCandidateIO.data := scratchpadIO.read(0)(1).data
     // the memory is always ready to be used by the aligners, but the aligners may not always be valid
-    alignerA.io.readIO.data.ready := true.B
-    alignerB.io.readIO.data.ready := true.B
+    aligner.io.readDataIO.data.ready := true.B
+    aligner.io.readCandidateIO.data.ready := true.B
     // connect the aligner addresses
-    alignerA.io.readIO.address.bits := matchA
-    alignerB.io.readIO.address.bits := matchB
+    aligner.io.readDataIO.address.bits := matchA
+    aligner.io.readCandidateIO.address.bits := matchB
     // addresses sent to the aligners are always valid, but the aligners may choose not to be ready
-    alignerA.io.readIO.address.valid := true.B
-    alignerB.io.readIO.address.valid := true.B
-
-    aligner.io.readDataIO.data.ready := matchFinder.io.newData.ready || copyEmitter.io.data.forall((a) => a.ready === true.B)
+    aligner.io.readDataIO.address.valid := true.B
+    aligner.io.readCandidateIO.address.valid := true.B
 
     /*
     * Match finder
@@ -162,16 +162,17 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     memoryctrlIO.writeBaseAddr := dst
     memoryctrlIO.length := length
     memoryctrlIO.busy := busy
-    memoryctrlIO.matchA := matchB   // should be reverse matchB is matchA and matchA is match B
-    memoryctrlIO.matchB := matchA
+    memoryctrlIO.matchA := (matchB - src) % (params.scratchpadEntries * params.scratchpadWidth / 8).U  // should be reverse matchB is matchA and matchA is match B
+    memoryctrlIO.matchB := (matchA - src) % (params.scratchpadEntries * params.scratchpadWidth / 8).U
     memoryctrlIO.nextEmit.bits := nextEmit
     memoryctrlIO.nextEmit.valid := nextEmitValid
-    memoryctrlIO.emitEmptyBytePos := nextEmit
+    memoryctrlIO.emitEmptyBytePos := nextEmit // not correct should be recorded as write bank ptr
     memoryctrlIO.emitEmptyBytePos.valid := nextEmitValid
-    memoryctrlIO.matchFound := matchFinder.io.matchA.valid
+    memoryctrlIO.matchFound := realMatchFound
     memoryctrlIO.equal := copyEmitter.io.equal
     // -- encode end when : in literal mode, remain is 0; in copy mode, copy is not busy anymore
     memoryctrlIO.endEncode := (remain === 0.U) && (~copyEmitter.io.copyBusy)
+    memoryctrlIO.storeData.valid := !memoryctrlIO.fullSW && (streamcounter === 7.U) && (matchFinder.io.matchA) /// needs to check !!!!!!!!!!!!
 
     // when stream is true, bytes read from the read bank will be sent into the write bank
     val stream = RegInit(true.B)
@@ -257,6 +258,8 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
             busy := true.B
             src := cmd.bits.rs1
             dst := cmd.bits.rs2
+            mask := (0x000000FF).U
+            streamcounter := 0.U
         }.elsewhen(doUncompress) {
             busy := true.B
             // ...
