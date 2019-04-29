@@ -51,15 +51,15 @@ class MemoryReadAligner(readAddressWidth: Int, readDataWidth: Int, memAddressWid
   // Lower and upper read address for data and candidat in the buffer
   val lowerReadAddress_data = RegInit(0.U(readAddressWidth.W))
   val upperReadAddress_data = RegInit(0.U(readAddressWidth.W))
-  val lowerReadOffset_data = Wire(UInt((log2Ceil(memBytes)+1).W))
-  val bytesInLowerRead_data = Wire(UInt((log2Ceil(memBytes)).W))
-  val bytesInUpperRead_data = Wire(UInt((log2Ceil(memBytes)).W))
+  val lowerReadOffset_data: UInt = Wire(UInt((log2Ceil(memBytes)+1).W))
+  val bytesInLowerRead_data: UInt = Wire(UInt(log2Ceil(memBytes).W))
+  val bytesInUpperRead_data: UInt = Wire(UInt(log2Ceil(memBytes).W))
 
   val lowerReadAddress_candidate = RegInit(0.U(readAddressWidth.W))
   val upperReadAddress_candidate = RegInit(0.U(readAddressWidth.W))
-  val lowerReadOffset_candidate = Wire(UInt((log2Ceil(memBytes)+1).W))
-  val bytesInLowerRead_candidate = Wire(UInt((log2Ceil(memBytes)).W))
-  val bytesInUpperRead_candidate = Wire(UInt((log2Ceil(memBytes)).W))
+  val lowerReadOffset_candidate: UInt = Wire(UInt((log2Ceil(memBytes)+1).W))
+  val bytesInLowerRead_candidate: UInt = Wire(UInt(log2Ceil(memBytes).W))
+  val bytesInUpperRead_candidate: UInt = Wire(UInt(log2Ceil(memBytes).W))
 
   // reverse input from memory
   //val memDataRev = Wire(Vec(memBytes, UInt(8.W)))
@@ -69,8 +69,8 @@ class MemoryReadAligner(readAddressWidth: Int, readDataWidth: Int, memAddressWid
   val memRespCandidate = RegInit(false.B)
 
   // Flag to indicate whether it's time to shift the register
-  val shiftData = Wire(Bool())
-  val shiftCandidate = Wire(Bool())
+  val shiftData: Bool = Wire(Bool())
+  val shiftCandidate: Bool = Wire(Bool())
   val shiftData_prev = Reg(Bool())
   val shiftCandidate_prev = Reg(Bool())
 
@@ -134,7 +134,7 @@ class MemoryReadAligner(readAddressWidth: Int, readDataWidth: Int, memAddressWid
     .otherwise{
       when(io.readDataIO.address.bits < lowerReadAddress_data*memBytes.U){
         initializedData := false.B
-        readyData.foreach{(a) => a := false.B}
+        readyData.foreach{a => a := false.B}
       }
       .elsewhen(shiftData){ // This is the time for cachedData to move and update
         lowerReadAddress_data := upperReadAddress_data
@@ -219,7 +219,7 @@ class MemoryReadAligner(readAddressWidth: Int, readDataWidth: Int, memAddressWid
 
   when(!io.equal){
     initializedCandidate := false.B
-    readyCandidate.foreach{(a) => a := false.B}
+    readyCandidate.foreach{a => a := false.B}
   }
 
 }
