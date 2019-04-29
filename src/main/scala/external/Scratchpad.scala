@@ -114,7 +114,8 @@ class ScratchpadReadIO(val n: Int, val w: Int) extends Bundle {
 class ScratchpadWriteIO(val n: Int, val w: Int) extends Bundle {
   val en = Output(Bool())
   val addr = Output(UInt(log2Ceil(n).W))
-  val data = Output(UInt(w.W))
+  val data = Output(Vec(w/8, UInt(8.W)))
+  val mask = Output(Vec(w/8, Bool()))
 }
 
 class ScratchpadBank(n: Int, w: Int) extends Module {
@@ -123,12 +124,12 @@ class ScratchpadBank(n: Int, w: Int) extends Module {
     val write = Flipped(new ScratchpadWriteIO(n, w))
   })
 
-  val mem = SyncReadMem(n, UInt(w.W))
+  val mem = SyncReadMem(n, Vec(w/8, UInt(8.W)))
 
-  when (io.write.en) { mem.write(io.write.addr, io.write.data) }
+  when (io.write.en) { mem.write(io.write.addr, io.write.data, io.write.mask) }
 
-  io.read(0).data := mem.read(io.read(0).addr, io.read(0).en)
-  io.read(1).data := mem.read(io.read(1).addr, io.read(1).en)
+  io.read(0).data := mem.read(io.read(0).addr, io.read(0).en).asUInt()
+  io.read(1).data := mem.read(io.read(1).addr, io.read(1).en).asUInt()
 }
 
 class Scratchpad(

@@ -235,14 +235,8 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
         nextEmitValid := false.B
     }
 
-
-
-
-
-
-
-
-
+      
+      
     // initialize each operation
     when(cmd.fire()) {
         when(doSetLength) {
