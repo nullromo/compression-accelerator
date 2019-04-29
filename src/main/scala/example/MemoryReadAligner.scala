@@ -93,41 +93,41 @@ class MemoryReadAligner(readAddressWidth: Int, readDataWidth: Int, memAddressWid
   memRespCandidate := io.memCandidateIO.en
 
   // do some math
-  lowerReadOffset_data := Mux(~shiftData, io.readDataIO.address.bits % memBytes.U, io.readDataIO.address.bits % memBytes.U + memBytes.U)
+  lowerReadOffset_data := Mux(!shiftData, io.readDataIO.address.bits % memBytes.U, io.readDataIO.address.bits % memBytes.U + memBytes.U)
   bytesInLowerRead_data  := Mux(lowerReadOffset_data + readBytes.U < memBytes.U,
     readBytes.U,
     memBytes.U - lowerReadOffset_data
   )
   bytesInUpperRead_data := readBytes.U - bytesInLowerRead_data
 
-  lowerReadOffset_candidate := Mux(~shiftCandidate, io.readCandidateIO.address.bits % memBytes.U, io.readCandidateIO.address.bits % memBytes.U + memBytes.U)
+  lowerReadOffset_candidate := Mux(!shiftCandidate, io.readCandidateIO.address.bits % memBytes.U, io.readCandidateIO.address.bits % memBytes.U + memBytes.U)
   bytesInLowerRead_candidate := Mux(lowerReadOffset_candidate + readBytes.U < memBytes.U,
     readBytes.U,
     memBytes.U - lowerReadOffset_candidate
   )
   bytesInUpperRead_candidate := readBytes.U - bytesInLowerRead_candidate
 
-  io.memDataIO.address := Mux(~initializedData || (initializedData && ~initializedData_prev), 
-                              Mux(~memRespData, io.readDataIO.address.bits / memBytes.U, upperReadAddress_data), 
+  io.memDataIO.address := Mux(!initializedData || (initializedData && !initializedData_prev), 
+                              Mux(!memRespData, io.readDataIO.address.bits / memBytes.U, upperReadAddress_data), 
                               upperReadAddress_data+1.U)
-  io.memDataIO.en := Mux(~initializedData || (initializedData && ~initializedData_prev), io.readDataIO.address.valid || memRespData, shiftData)
+  io.memDataIO.en := Mux(!initializedData || (initializedData && !initializedData_prev), io.readDataIO.address.valid || memRespData, shiftData)
   io.readDataIO.data.valid := (io.readDataIO.address.valid && readyData(0) && readyData(1)) && (io.readDataIO.address.bits >= lowerReadAddress_data * memBytes.U)
-  io.readDataIO.address.ready := ~((io.readDataIO.address.valid && ~readyData(1)) || (io.readDataIO.address.valid && (io.readDataIO.address.bits < lowerReadAddress_data*memBytes.U)))
+  io.readDataIO.address.ready := !((io.readDataIO.address.valid && !readyData(1)) || (io.readDataIO.address.valid && (io.readDataIO.address.bits < lowerReadAddress_data*memBytes.U)))
 
 
-  io.memCandidateIO.address := Mux(~initializedCandidate || (initializedCandidate && ~initializedCandidate_prev), 
+  io.memCandidateIO.address := Mux(!initializedCandidate || (initializedCandidate && !initializedCandidate_prev), 
                                     Mux(memRespCandidate, io.readCandidateIO.address.bits / memBytes.U, upperReadAddress_candidate), 
                                     upperReadAddress_candidate+1.U)
-  io.memCandidateIO.en := Mux(~initializedCandidate || (initializedCandidate && ~initializedCandidate_prev), io.readCandidateIO.address.valid || memRespCandidate, shiftCandidate)
+  io.memCandidateIO.en := Mux(!initializedCandidate || (initializedCandidate && !initializedCandidate_prev), io.readCandidateIO.address.valid || memRespCandidate, shiftCandidate)
   io.readCandidateIO.data.valid := io.readCandidateIO.address.valid && readyCandidate(0) && readyCandidate(1)
-  io.readCandidateIO.address.ready := ~(~initializedCandidate && readyCandidate(0) && ~readyCandidate(1))
+  io.readCandidateIO.address.ready := !(!initializedCandidate && readyCandidate(0) && !readyCandidate(1))
 
 
   // Logic of data buffer
   // how does lower read address and upper read address changes
 
   when(io.readDataIO.address.valid){ // The first time fetch data
-    when(~initializedData){
+    when(!initializedData){
       lowerReadAddress_data := io.readDataIO.address.bits / memBytes.U
       upperReadAddress_data := io.readDataIO.address.bits / memBytes.U + 1.U
     }
@@ -145,7 +145,7 @@ class MemoryReadAligner(readAddressWidth: Int, readDataWidth: Int, memAddressWid
   }
 
   // how does the data is stored
-  when(~initializedData){
+  when(!initializedData){
     when(memRespData){
       cachedData(0) := Cat(io.memDataIO.data.asTypeOf(Vec(memBytes, UInt(8.W)))) // don't know whether it will work or not
       readyData(0) := true.B
@@ -153,7 +153,7 @@ class MemoryReadAligner(readAddressWidth: Int, readDataWidth: Int, memAddressWid
     }
   }
   .otherwise{
-    when(memRespData && ~(io.readDataIO.address.bits < lowerReadAddress_data*memBytes.U)){
+    when(memRespData && !(io.readDataIO.address.bits < lowerReadAddress_data*memBytes.U)){
       cachedData(1) := Cat(io.memDataIO.data.asTypeOf(Vec(memBytes, UInt(8.W))))
       readyData(1) := true.B
     }
@@ -162,7 +162,7 @@ class MemoryReadAligner(readAddressWidth: Int, readDataWidth: Int, memAddressWid
   // data output
   // concatenate the appropriate bytes from the lower and upper read data into the final output
   val aggregateReadData: Vec[UInt] = Wire(Vec(memBytes * 2, UInt(8.W)))
-  aggregateReadData := Mux(shiftData_prev && ~shiftData,
+  aggregateReadData := Mux(shiftData_prev && !shiftData,
                            Cat(/*cachedData(0),*/ Cat(io.memDataIO.data.asTypeOf(Vec(memBytes, UInt(8.W)))), cachedData(0)).asTypeOf(Vec(memBytes * 2, UInt(8.W))),
                            Cat(/*cachedData(0),*/ cachedData(1), cachedData(0)).asTypeOf(Vec(memBytes * 2, UInt(8.W))))
   // select the correct output
@@ -176,7 +176,7 @@ class MemoryReadAligner(readAddressWidth: Int, readDataWidth: Int, memAddressWid
   // how does lower read address and upper read address changes
 
   when(io.readCandidateIO.address.valid){ // The first time fetch data
-    when(~initializedCandidate){
+    when(!initializedCandidate){
       lowerReadAddress_candidate := io.readCandidateIO.address.bits / memBytes.U
       upperReadAddress_candidate := io.readCandidateIO.address.bits / memBytes.U + 1.U
     }
@@ -190,7 +190,7 @@ class MemoryReadAligner(readAddressWidth: Int, readDataWidth: Int, memAddressWid
   }
 
   // how does the Candidates is stored
-  when(~initializedCandidate){
+  when(!initializedCandidate){
     when(memRespCandidate){
       cachedCandidate(0) := Cat(io.memCandidateIO.data.asTypeOf(Vec(memBytes, UInt(8.W)))) // don't know whether it will work or not
       readyCandidate(0) := true.B
@@ -207,7 +207,7 @@ class MemoryReadAligner(readAddressWidth: Int, readDataWidth: Int, memAddressWid
   // data output
   // concatenate the appropriate bytes from the lower and upper read data into the final output
   val aggregateReadCandidate: Vec[UInt] = Wire(Vec(memBytes * 2, UInt(8.W)))
-  aggregateReadCandidate := Mux(shiftCandidate_prev && ~shiftCandidate,
+  aggregateReadCandidate := Mux(shiftCandidate_prev && !shiftCandidate,
                                 Cat(/*cachedCandidate(0),*/ Cat(io.memCandidateIO.data.asTypeOf(Vec(memBytes, UInt(8.W)))), cachedCandidate(0)).asTypeOf(Vec(memBytes * 2, UInt(8.W))),
                                 Cat(/*cachedCandidate(0),*/ cachedCandidate(1), cachedCandidate(0)).asTypeOf(Vec(memBytes * 2, UInt(8.W))))
   // select the correct output
@@ -217,7 +217,7 @@ class MemoryReadAligner(readAddressWidth: Int, readDataWidth: Int, memAddressWid
     })
   )
 
-  when(~io.equal){
+  when(!io.equal){
     initializedCandidate := false.B
     readyCandidate.foreach{(a) => a := false.B}
   }
