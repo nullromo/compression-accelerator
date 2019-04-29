@@ -70,6 +70,8 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     val inputEnd: UInt = src + length
     val inputLimit: UInt = inputEnd - kInputMarginBytes
 
+    // valid match found
+    val realMatchFound = Wire(Bool())
 
 
 
@@ -171,19 +173,37 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
         scratchpadIO.write(1).data := Mux(???, alignerB.io.readIO.data, copyEmitter.io.copyCompressed.bits.copy)
 
 
-    // Change of matchB (which is dataPtr)
+    // ****** Change of matchB (which is dataPtr) ******
     // -- when the system is finding match, add skip byte number when match finder is ready to receive data and dataPtr is within range
     // -- when the system is finding copy, add bufferIncPtr.bits every cycle when valid and dataPtr is within range
+    // -- matchA and matchB are not reading address in scratchpad
+    // ****** Change of MatchA (which is candidatePtr) ******
+    // -- when match found, matchA should be the output of matchfinder
+    // ----- need to check whether the hit is valid or not: if address < minvAddr + 8 (to keep aligner and controller working properly, two lines cannot be used)
+    // -- when finding copy, matchA should be increased the same way as dataPtr
+
+    realMatchFound := matchFinder.io.matchA.valid && (matchFinder.io.matchA.bits >= scratchpadIO.minvAddr + 8.U)
+
     when(!copyEmitter.io.copyBusy) {
         when(matchFinder.io.newData.ready && !scratchpadIO.outOfRangeFlag){
-            matchB := matchB + 1.U // can be changed to skip later
+            when(!matchFinder.io.matchA.valid) {
+                matchB := matchB + 1.U // can be changed to skip later, also when match found, matchB should move + 4
+            }
+            .otherwise{
+                matchB := matchB + 4.U // beacause at least 4 bytes should be the same
+            }
+        }
+        when(realMatchFound) {
+            matchA := matchFinder.io.matchA.bits + 4.U
         }
     }
     .otherwise{
         when(copyEmitter.io.bufferIncPtr.valid && !scratchpadIO.outOfRangeFlag){
             matchB := matchB + copyEmitter.io.bufferIncPtr.bits
+            matchA := matchA + copyEmitter.io.bufferIncPtr.bits
         }
     }
+
 
 
 

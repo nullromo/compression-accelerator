@@ -78,7 +78,7 @@ class CopyCompress(val params: CopyCompressParams) extends Module {
 
     when(io.hit) {
         start_reg := true.B
-        lengthAccum := 0.U
+        lengthAccum := 4.U
         equal_reg := true.B
         equal_reg_prev := true.B
     }
