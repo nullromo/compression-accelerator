@@ -122,8 +122,8 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     aligner.io.readDataIO.data.ready := true.B
     aligner.io.readCandidateIO.data.ready := true.B
     // connect the aligner addresses
-    aligner.io.readDataIO.address.bits := matchA
-    aligner.io.readCandidateIO.address.bits := matchB
+    aligner.io.readDataIO.address.bits := matchB
+    aligner.io.readCandidateIO.address.bits := matchA
     // addresses sent to the aligners are always valid, but the aligners may choose not to be ready
     aligner.io.readDataIO.address.valid := true.B
     aligner.io.readCandidateIO.address.valid := true.B
@@ -201,6 +201,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     // -- encode end when : in literal mode, remain is 0; in copy mode, copy is not busy anymore
     memoryctrlIO.endEncode := (remain === 0.U) && (!copyEmitter.io.copyBusy)
     memoryctrlIO.storeData.valid := !memoryctrlIO.fullSW && (streamCounter > 7.U) /// needs to check !!!!!!!!!!!!
+	scratchpadIO.dma <> memoryctrlIO.dma
 
     // when stream is true, bytes read from the read bank will be sent into the write bank
     val stream = RegInit(true.B)
