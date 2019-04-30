@@ -268,7 +268,7 @@ class Scratchpad(
       read(0).data := bank.io.read(0).data
       read(1).data := bank.io.read(1).data
       when (req.spbank === i.U) { dmardata := bank.io.read(0).data }
-      //when (req.spbank === i.U) { dmardata := bank.io.read(1).data }
+      //when (req.spbank === i.U) { dmardata := bank.io.read(1).data } // we don't want this second dma port
 
       bank.io.write.en := bankwen || write.en
       bank.io.write.addr := Mux(bankwen, req.spaddr, write.addr)
