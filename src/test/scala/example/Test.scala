@@ -75,7 +75,7 @@ class CompressionAcceleratorSpec extends ChiselFlatSpec {
 
   val dutGen: () => ScratchpadTestModule = () => LazyModule(new ScratchpadTest(OpcodeSet.custom3)).module
   "CompressionAccelerator" should "accept commands" in {
-    Driver.execute(TesterArgs()/* :+ "CompressionAccelerator"*/, dutGen) {
+    Driver.execute(TesterArgs() :+ "CompressionAccelerator", dutGen) {
       c => new CompressionAcceleratorTester(c)
     } should be(true)
   }
