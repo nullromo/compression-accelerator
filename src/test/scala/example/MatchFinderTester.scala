@@ -10,11 +10,11 @@ class MatchFinderTester(c: MatchFinderTestModule) extends PeekPokeTester(c) {
     var matchesFound: Array[(BigInt, BigInt)] = Array[(BigInt, BigInt)]()
 
     // always be ready for output and always send valid input
-    poke(c.io.matchA.ready, true)
-    poke(c.io.start.valid, true)
+    poke(c.io.matchFinderIO.matchA.ready, true)
+    poke(c.io.matchFinderIO.start.valid, true)
 
     // set global base
-    poke(c.io.src, 0)
+    poke(c.io.matchFinderIO.src, 0)
 
     // keep track of pointers
     var base: BigInt = 0
@@ -24,15 +24,17 @@ class MatchFinderTester(c: MatchFinderTestModule) extends PeekPokeTester(c) {
     // count matches found
     var matches = 0
 
+    s(10)
+
     // find matches
     while (base < 69 && cycles < 1000) {
-        poke(c.io.matchB, matchB)
+        poke(c.io.matchFinderIO.matchB, matchB)
         // send in the input
-        poke(c.io.start.bits, base)
+        poke(c.io.matchFinderIO.start.bits, base)
 
         // if the output is valid, deal with it
-        if (peek(c.io.matchA.valid) != 0) {
-            base = peek(c.io.matchA.bits)
+        if (peek(c.io.matchFinderIO.matchA.valid) != 0) {
+            base = peek(c.io.matchFinderIO.matchA.bits)
             end = matchB
             matches += 1
             println("match found: " + base + " to " + end)
@@ -41,6 +43,8 @@ class MatchFinderTester(c: MatchFinderTestModule) extends PeekPokeTester(c) {
         }
 
         s(1)
+        if(peek(c.io.advanceMatchB) != 0)
+            matchB += 1
     }
 
     println(matches + " matches found.")
@@ -55,7 +59,6 @@ class MatchFinderTester(c: MatchFinderTestModule) extends PeekPokeTester(c) {
     def s(n: Int): Unit = {
         step(n)
         cycles += n
-        matchB += 1
     }
 }
 

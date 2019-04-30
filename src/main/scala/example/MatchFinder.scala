@@ -78,7 +78,10 @@ class MatchFinder(dataWidth: Int, addressWidth: Int, hashTableSize: Int) extends
 
 class MatchFinderTestModule(memDataWidth: Int, dataWidth: Int, addressWidth: Int, hashTableSize: Int) extends Module {
     // use the same IO as the matchFinder
-    val io = IO(new MatchFinderIO(dataWidth, addressWidth))
+    val io = IO(new Bundle {
+        val advanceMatchB = Output(Bool())
+        val matchFinderIO = new MatchFinderIO(dataWidth, addressWidth)
+    })
 
     // create a matchFinder
     val matchFinder = Module(new MatchFinder(dataWidth: Int, addressWidth: Int, hashTableSize: Int))
@@ -97,20 +100,26 @@ class MatchFinderTestModule(memDataWidth: Int, dataWidth: Int, addressWidth: Int
     ))
 
     // connect aligner to memory
-    aligner.io.memIO.data := mem.read(aligner.io.memIO.address)
+    aligner.io.memDataIO.data := mem.read(aligner.io.memDataIO.address)
 
     // connect the matchFinder to the read aligner
-    aligner.io.readIO.address.bits := io.matchB
-    aligner.io.readIO.address.valid := true.B
-    matchFinder.io.newData <> aligner.io.readIO.data
+    aligner.io.readDataIO.address.bits := io.matchFinderIO.matchB
+    aligner.io.readDataIO.address.valid := true.B
+    matchFinder.io.newData <> aligner.io.readDataIO.data
 
     // pass the rest of the IO through
-    matchFinder.io.start <> io.start
-    io.matchA <> matchFinder.io.matchA
-    io.newData <> DontCare
-    matchFinder.io.src := io.src
-    matchFinder.io.matchB := io.matchB
+    matchFinder.io.start <> io.matchFinderIO.start
+    io.matchFinderIO.matchA <> matchFinder.io.matchA
+    io.matchFinderIO.newData <> DontCare
+    matchFinder.io.src := io.matchFinderIO.src
+    matchFinder.io.matchB := io.matchFinderIO.matchB
+
+    io.advanceMatchB := aligner.io.readDataIO.data.valid
 
     dontTouch(aligner.io)
     dontTouch(matchFinder.io)
+
+    aligner.io.readCandidateIO := DontCare
+    aligner.io.memCandidateIO := DontCare
+    aligner.io.equal := false.B
 }

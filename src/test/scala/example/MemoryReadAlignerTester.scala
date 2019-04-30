@@ -6,7 +6,7 @@ import scala.io.Source
 
 class MemoryReadAlignerTester(c: MemoryReadAlignerTestModule, sequential: Boolean) extends PeekPokeTester(c) {
   // load the memory data for comparison
-  val memMap = Array.fill(800){""}
+  val memMap: Array[String] = Array.fill(800){""}
   var lineNum = 0
   for (line <- Source.fromFile("data/alignerTestData.txt").getLines()) {
     for(i <- 0 until 8) {
