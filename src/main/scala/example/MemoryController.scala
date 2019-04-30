@@ -100,7 +100,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
             tailSWp := tailSWp + 1.U
 			emptySW := false.B
         }
-        io.storeData.ready := ~(fullSW || (stateDMA === s_dma_write))
+        io.storeData.ready := !(fullSW || (stateDMA === s_dma_write))
 
         // dma request logic
         // -- DMA will send request when stateDMA is at s_dma_read or s_dma_write
@@ -110,12 +110,12 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
         io.dma.req.bits.spaddr := Mux(stateDMA === s_dma_read, tailLDp, headSWp)
         io.dma.req.bits.spbank := Mux(stateDMA === s_dma_read, 0.U, 1.U)
         io.dma.req.bits.write := stateDMA === s_dma_write
-        io.dma.req.valid := ((stateDMA === s_dma_read && ~fullLD && ~fullSW) || (stateDMA === s_dma_write && ((~emptySW && ~io.emitEmptyBytePos.valid) || (headSWp =/= (io.emitEmptyBytePos.bits /dataBytes.U) && io.emitEmptyBytePos.valid) )))
+        io.dma.req.valid := ((stateDMA === s_dma_read && !fullLD && !fullSW) || (stateDMA === s_dma_write && ((!emptySW && !io.emitEmptyBytePos.valid) || (headSWp =/= (io.emitEmptyBytePos.bits /dataBytes.U) && io.emitEmptyBytePos.valid) )))
         io.dma.resp.ready := true.B
 
         // connect the rest of the output
-        io.readScratchpadReady := ~emptyLD && (stateWork > s_fill) && ~(outOfRange || (stateDMA === s_dma_write))
-        io.findMatchBegin := (~(outOfRange || (stateDMA === s_dma_write))) && (stateWork > s_fill)
+        io.readScratchpadReady := !emptyLD && (stateWork > s_fill) && !(outOfRange || (stateDMA === s_dma_write))
+        io.findMatchBegin := (!(outOfRange || (stateDMA === s_dma_write))) && (stateWork > s_fill)
 
         // force emit literal when scratch pad 
         io.forceLiteral := (headLDp === io.nextEmit.bits / dataBytes.U) && io.nextEmit.valid
@@ -186,7 +186,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
                     printf("DMA returned Out-of-range read error=true in a response (page fault?)\n")
                 }
                 .otherwise{
-                    when((headSWp === (tailSWp-1.U)) && ~emptySW){
+                    when((headSWp === (tailSWp-1.U)) && !emptySW){
                         emptySW := true.B
                     }.otherwise{
                         headSWp := headSWp + 1.U
@@ -196,7 +196,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
             }
 
             when(io.dma.req.ready && ((emptySW && !io.emitEmptyBytePos.valid) || (headSWp === (io.emitEmptyBytePos.bits / dataBytes.U) && io.emitEmptyBytePos.valid))){
-                when(~io.endEncode){
+                when(!io.endEncode){
                     stateWork := s_working
                 }
                 .otherwise{
@@ -205,7 +205,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
             }
         }
         .elsewhen(stateWork === s_done){
-            when(~io.busy){
+            when(!io.busy){
                 stateWork := s_idle
             }
         }
@@ -220,7 +220,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
             when(fullSW || io.endEncode){
                 stateDMA := s_dma_write
             }
-            .elsewhen((~fullLD || outOfRange) && ~endLoad){
+            .elsewhen((!fullLD || outOfRange) && !endLoad){
                 stateDMA := s_dma_read
             }
 
@@ -235,7 +235,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
         }
         .elsewhen(stateDMA === s_dma_write){
             when(((emptySW && !io.emitEmptyBytePos.valid) || (headSWp === (io.emitEmptyBytePos.bits / dataBytes.U) && io.emitEmptyBytePos.valid))
-                   && fullLD && ~io.endEncode && io.dma.req.ready){
+                   && fullLD && !io.endEncode && io.dma.req.ready){
                 stateDMA := s_dma_wait
             }
             .elsewhen(((emptySW && !io.emitEmptyBytePos.valid) || (headSWp === (io.emitEmptyBytePos.bits / dataBytes.U) && io.emitEmptyBytePos.valid))
@@ -243,7 +243,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
                 stateDMA := s_done
             }
             .elsewhen(((emptySW && !io.emitEmptyBytePos.valid) || (headSWp === (io.emitEmptyBytePos.bits / dataBytes.U) && io.emitEmptyBytePos.valid))
-                        && ~fullLD && ~endLoad && io.dma.req.ready){
+                        && !fullLD && !endLoad && io.dma.req.ready){
                 stateDMA := s_dma_read
             }
 			.elsewhen(((emptySW && !io.emitEmptyBytePos.valid) || (headSWp === (io.emitEmptyBytePos.bits / dataBytes.U) && io.emitEmptyBytePos.valid))
@@ -252,7 +252,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
 			}
         }
         .elsewhen(stateDMA === s_done){
-            when(~io.busy){
+            when(!io.busy){
                 stateDMA := s_idle
             }
         }
