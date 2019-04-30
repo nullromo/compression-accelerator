@@ -1,6 +1,7 @@
 package example
 
 import chisel3._
+import chisel3.core.dontTouch
 import chisel3.util._
 import external.{FrontendTLB, Scratchpad, ScratchpadMemRequest}
 import freechips.rocketchip.config.Parameters
@@ -71,43 +72,42 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     val inputEnd: UInt = src + length
     val inputLimit: UInt = inputEnd - kInputMarginBytes
 
-    // valid match found
+    // valid match found (matchA is in valid scratchpad look-back range)
     val realMatchFound: Bool = Wire(Bool())
-    // remain logic
+    // keep track of how many bytes there are left to compress
     val remain: UInt = Wire(UInt(64.W))
-    // prev_copyBusy
+    // true when the copy path was working on the previous cycle
     val prev_copyBusy = RegInit(false.B)
+    // true when the matchFinder was ready to start on the previous cycle
     val prev_startReady = RegInit(true.B)
+    // true when an emit was forced on the previous cycle
     val prev_forceEmit = RegInit(false.B)
-    // write bank mask
-    //    val mask = RegInit(0.U(8.W))
+
+    // keeps track of how many things are being copied to the write bank
     val streamCounter = RegInit(0.U(4.W))
+    // buffer for data being copied to write bank
     val streamHolder = RegInit(VecInit(Seq.fill(16)(0.U(8.W))))
     val streamEmpty = RegInit(false.B)
+    // flag for when the length of a literal goes to 60
     val forceEmit: Bool = Wire(Bool())
+    // for the empty literal length slot, this is the offset within the stream buffer
     val emptySpotCounter = RegInit(0.U(3.W))
+    // holds the actual address of the empty slot so that it can be filled in later
     val emptySpotAddr = RegInit(0.U(log2Ceil(params.scratchpadEntries).W))
 
-    /*
-    * Main pointers
-    */
-    // output pointer
-    val scratchpadWriteAddress = RegInit(0.U(32.W))
-    // keep track of the range that the scratchpad contains
-    val minScratchpadAddress = RegInit(0.U(32.W))
-    val maxScratchpadAddress = RegInit(0.U(32.W))
     // everything between src and nextEmit has been accounted for in the output
     val nextEmit = RegInit(0.U(32.W))
     val nextEmitValid = RegInit(false.B)
     // two pointers for the matches
     val matchA = RegInit(0.U(32.W))
     val matchB = RegInit(0.U(32.W))
+    // distance between matchA and matchB
     val offset = RegInit(0.U(32.W))
 
     /*
-    * Read aligners
+    * Read aligner
     */
-    // adapters to read the scratchpad byte-by-byte in 32-bit chunks
+    // adapter to read the scratchpad byte-by-byte in 32-bit chunks
     val aligner = Module(new MemoryReadAligner(
         32, 32, 32, 64
     ))
@@ -281,15 +281,15 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     }
 
     // ****** remain logic *******
-    remain := length - (matchB - minScratchpadAddress)
+    remain := length - (matchB - src)
 
     // ****** next emit logic ******
     // -- nextEmit should be the matchB position when system just finish copy emitter
-    // -- nextEmit valid when the literal emmitter finsh current match found and store them back in to write bank
+    // -- nextEmit valid when the literal emitter finish current match found and store them back into write bank
     when((!copyEmitter.io.copyBusy && prev_copyBusy) || forceEmit) {
         nextEmit := matchB
         nextEmitValid := true.B
-        emptySpotAddr := Mux(streamCounter <= 7.U, memoryctrlIO.storeSpAddr, memoryctrlIO.storeSpAddr + 1.U)
+        emptySpotAddr := memoryctrlIO.storeSpAddr + (streamCounter / 8.U)
         emptySpotCounter := streamCounter % 8.U
     }
 
@@ -303,8 +303,6 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
         when(doSetLength) {
             length := cmd.bits.rs1
         }.elsewhen(doCompress) {
-            minScratchpadAddress := cmd.bits.rs1
-            maxScratchpadAddress := cmd.bits.rs1
             nextEmit := cmd.bits.rs1
             nextEmitValid := true.B
             matchA := cmd.bits.rs1
@@ -313,7 +311,6 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
             busy := true.B
             src := cmd.bits.rs1
             dst := cmd.bits.rs2
-            //            mask := 255.U
             streamCounter := 0.U
             streamHolder.foreach(_ := 0.U)
             streamEmpty := true.B
@@ -324,6 +321,13 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
             // ...
         }
     }
+
+    dontTouch(nextEmit)
+    dontTouch(nextEmitValid)
+    dontTouch(dst)
+    dontTouch(streamCounter)
+    dontTouch(streamHolder)
+    dontTouch(streamEmpty)
 
     matchFinder.io.clear := cmd.fire()
 

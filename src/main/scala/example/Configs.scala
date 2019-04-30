@@ -1,12 +1,14 @@
 package example
 
 import chisel3._
-import freechips.rocketchip.config.{Config, Parameters}
-import freechips.rocketchip.subsystem.{WithNBigCores, WithNMemoryChannels, WithRV32, WithRoccExample,RocketTilesKey}
+import freechips.rocketchip.config.{Config, Field, Parameters}
+import freechips.rocketchip.subsystem.{CanHaveMasterAXI4MemPort, CanHaveMasterAXI4MemPortModuleImp, HasRTCModuleImp, RocketTilesKey, WithNBigCores, WithNMemoryChannels, WithRV32, WithRoccExample}
 import freechips.rocketchip.diplomacy.{LazyModule, ValName}
-import freechips.rocketchip.devices.tilelink.BootROMParams
+import freechips.rocketchip.devices.tilelink.{BootROMParams, HasPeripheryBootROM, HasPeripheryBootROMModuleImp}
 import freechips.rocketchip.rocket.{HasRocketCoreParameters, RocketCoreParams}
+import freechips.rocketchip.system.{ExampleRocketSystem, ExampleRocketSystemModuleImp}
 import freechips.rocketchip.tile.{BuildRoCC, HasCoreParameters, OpcodeSet, XLen}
+import freechips.rocketchip.util.DontTouch
 import testchipip._
 
 class WithBootROM extends Config((site, here, up) => {
@@ -19,35 +21,30 @@ object ConfigValName {
 }
 import ConfigValName._
 
+class ExampleTop(implicit p: Parameters) extends ExampleRocketSystem //RocketSubsystem
+    with CanHaveMasterAXI4MemPort
+    with HasPeripheryBootROM
+    //  with HasSystemErrorSlave
+    //    with HasSyncExtInterrupts
+    with HasNoDebug
+    with HasPeripherySerial {
+  override lazy val module = new ExampleTopModule(this)
+}
+
+class ExampleTopModule[+L <: ExampleTop](l: L) extends ExampleRocketSystemModuleImp(l) // RocketSubsystemModuleImp(l)
+    with HasRTCModuleImp
+    with CanHaveMasterAXI4MemPortModuleImp
+    with HasPeripheryBootROMModuleImp
+    //    with HasExtInterruptsModuleImp
+    with HasNoDebugModuleImp
+    with HasPeripherySerialModuleImp
+    with DontTouch
+
+case object BuildTop extends Field[(Clock, Bool, Parameters) => ExampleTopModule[ExampleTop]]
+
 class WithExampleTop extends Config((site, here, up) => {
   case BuildTop => (clock: Clock, reset: Bool, p: Parameters) => {
     Module(LazyModule(new ExampleTop()(p)).module)
-  }
-})
-
-class WithPWM extends Config((site, here, up) => {
-  case BuildTop => (clock: Clock, reset: Bool, p: Parameters) =>
-    Module(LazyModule(new ExampleTopWithPWMTL()(p)).module)
-})
-
-class WithPWMAXI4 extends Config((site, here, up) => {
-  case BuildTop => (clock: Clock, reset: Bool, p: Parameters) =>
-    Module(LazyModule(new ExampleTopWithPWMAXI4()(p)).module)
-})
-
-class WithBlockDeviceModel extends Config((site, here, up) => {
-  case BuildTop => (clock: Clock, reset: Bool, p: Parameters) => {
-    val top = Module(LazyModule(new ExampleTopWithBlockDevice()(p)).module)
-    top.connectBlockDeviceModel()
-    top
-  }
-})
-
-class WithSimBlockDevice extends Config((site, here, up) => {
-  case BuildTop => (clock: Clock, reset: Bool, p: Parameters) => {
-    val top = Module(LazyModule(new ExampleTopWithBlockDevice()(p)).module)
-    top.connectSimBlockDevice(clock, reset)
-    top
   }
 })
 
@@ -60,26 +57,6 @@ class DefaultExampleConfig extends Config(
 
 class RoccExampleConfig extends Config(
   new WithRoccExample ++ new DefaultExampleConfig)
-
-class PWMConfig extends Config(new WithPWM ++ new BaseExampleConfig)
-
-class PWMAXI4Config extends Config(new WithPWMAXI4 ++ new BaseExampleConfig)
-
-class SimBlockDeviceConfig extends Config(
-  new WithBlockDevice ++ new WithSimBlockDevice ++ new BaseExampleConfig)
-
-class BlockDeviceModelConfig extends Config(
-  new WithBlockDevice ++ new WithBlockDeviceModel ++ new BaseExampleConfig)
-
-class WithTwoTrackers extends WithNBlockDeviceTrackers(2)
-class WithFourTrackers extends WithNBlockDeviceTrackers(4)
-
-class WithTwoMemChannels extends WithNMemoryChannels(2)
-class WithFourMemChannels extends WithNMemoryChannels(4)
-
-class DualCoreConfig extends Config(
-  // Core gets tacked onto existing list
-  new WithNBigCores(2) ++ new DefaultExampleConfig)
 
 class RV32ExampleConfig extends Config(
   new WithRV32 ++ new DefaultExampleConfig)

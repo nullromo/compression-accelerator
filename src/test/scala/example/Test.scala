@@ -15,46 +15,8 @@ import java.io.PrintWriter
 
 
 class CompressionAcceleratorTester(c: ScratchpadTestModule) extends PeekPokeTester(c) {
-	val randgen = new Random(15)
-	val memory_data = Array.fill[Seq[Int]](8)(Array.fill[Int]((pow(2,8)-1).toInt)(randgen.nextInt(256)))
 
-	for(i <- 0 until 8){
-		val fileName = "memdata/memdata.hex_" + i + ".txt"
-		val writer = new PrintWriter(new File(fileName))
-		for(k <- 0 until memory_data(i).length){
-			writer.write(memory_data(i)(k).toHexString)
-			if(k != memory_data(i).length-1)
-				writer.write("\n")
-		}
-		writer.close() 
-		print("finsih 1 file write!\n")
-		//val mem = "ram.mem_" + i
-		//loadMemFromFile(fileName, mem)
-	}
-
-	val fileNameall = "memdata/memdata.hex.txt"
-	val writerall = new PrintWriter(new File(fileNameall))
-	for(i <- 0 until memory_data(0).length){
-		var storeData: String = ""
-		for(k <- 0 until 8){
-			if(memory_data(k)(i) < 16)
-				storeData = storeData + "0" + memory_data(k)(i).toHexString
-			else
-				storeData = storeData + memory_data(k)(i).toHexString
-		}
-		writerall.write(storeData)			
-		if(i != memory_data(0).length -1)
-			writerall.write("\n")
-	}
-	writerall.close()
-	//val mem = "ram.mem_" + i
-	//loadMemFromFile(fileName, mem)
-	//val mem_array = Array.ofDim[String](8)
-	/*mem_array.zipWithIndex.foreach{case(mem, k) => mem_array(k) = "ram.mem_" + k
-												   val fileName = "memdata/memdata_"+k+".txt"
-												   loadMemFromFile(fileName, mem_array(k))}*/
-  
-	// set length
+    // set length
     poke(c.io.cmd.bits.inst.funct, 2) // doSetLength
     poke(c.io.cmd.bits.rs1, 4000) // length = 100
     poke(c.io.cmd.valid, true) // fire
@@ -66,84 +28,109 @@ class CompressionAcceleratorTester(c: ScratchpadTestModule) extends PeekPokeTest
     step(1)
     poke(c.io.cmd.valid, false)
     step(5000)
-	//  expect(peek(c.io.interrupt) != 277, "I should have passed ;(")
+    //  expect(peek(c.io.interrupt) != 277, "I should have passed ;(")
 
 }
 
 class CompressionAcceleratorSpec extends ChiselFlatSpec {
-  implicit val p: Parameters = AcceleratorParams()
+    implicit val p: Parameters = AcceleratorParams()
 
-  val dutGen: () => ScratchpadTestModule = () => LazyModule(new ScratchpadTest(OpcodeSet.custom3)).module
-  "CompressionAccelerator" should "accept commands" in {
-    Driver.execute(TesterArgs() :+ "CompressionAccelerator", dutGen) {
-      c => new CompressionAcceleratorTester(c)
-    } should be(true)
-  }
+    val dutGen: () => ScratchpadTestModule = () => LazyModule(new ScratchpadTest(OpcodeSet.custom3)).module
+    "CompressionAccelerator" should "accept commands" in {
+        Driver.execute(TesterArgs() :+ "CompressionAccelerator", dutGen) {
+            c => new CompressionAcceleratorTester(c)
+        } should be(true)
+    }
 }
 
 class GenerateMemdata extends FlatSpec with Matchers {
-  "Memdata generator" should "generate data" in {
-    val randgen = new Random(15)
-    val memory_data = Array.fill[Seq[Int]](8)(Array.fill[Int]((pow(2, 10) - 1).toInt)(randgen.nextInt(256)))
+    "Memdata generator" should "generate data" in {
+        val randgen = new Random(15)
+        val memory_data = Array.fill[Seq[Int]](8)(Array.fill[Int]((pow(2, 8) - 1).toInt)(randgen.nextInt(256)))
 
-    for (i <- 0 until 8) {
-      val fileName = "memdata/memdata_" + i + ".txt"
-      val writer = new PrintWriter(new File(fileName))
-      for (k <- memory_data(i).indices) {
-        writer.write(memory_data(i)(k).toString)
-        if (k != memory_data(i).length - 1)
-          writer.write("\n")
-      }
-      writer.close()
-      print("finsih 1 file write!\n")
+        for (i <- 0 until 8) {
+            val fileName = "memdata/memdata.hex_" + i + ".txt"
+            val writer = new PrintWriter(new File(fileName))
+            for (k <- memory_data(i).indices) {
+                writer.write(memory_data(i)(k).toHexString)
+                if (k != memory_data(i).length - 1)
+                    writer.write("\n")
+            }
+            writer.close()
+            print("finsih 1 file write!\n")
+            //val mem = "ram.mem_" + i
+            //loadMemFromFile(fileName, mem)
+        }
+
+        val fileNameall = "memdata/memdata.hex.txt"
+        val writerall = new PrintWriter(new File(fileNameall))
+        for (i <- memory_data(0).indices) {
+            var storeData: String = ""
+            for (k <- 0 until 8) {
+                if (memory_data(k)(i) < 16)
+                    storeData = storeData + "0" + memory_data(k)(i).toHexString
+                else
+                    storeData = storeData + memory_data(k)(i).toHexString
+            }
+            writerall.write(storeData)
+            if (i != memory_data(0).length - 1)
+                writerall.write("\n")
+        }
+        writerall.close()
+        //val mem = "ram.mem_" + i
+        //loadMemFromFile(fileName, mem)
+        //val mem_array = Array.ofDim[String](8)
+        /*mem_array.zipWithIndex.foreach{case(mem, k) => mem_array(k) = "ram.mem_" + k
+                                                       val fileName = "memdata/memdata_"+k+".txt"
+                                                       loadMemFromFile(fileName, mem_array(k))}*/
+
     }
-  }
 }
 
 class TreadleTest extends FlatSpec with Matchers {
-  implicit val p: Parameters = AcceleratorParams()
+    implicit val p: Parameters = AcceleratorParams()
 
-  "Something" should "do something" in {
-    val s = chisel3.Driver.emit(() => LazyModule(new ScratchpadTest(OpcodeSet.custom3)).module)
-    implicit val tester: TreadleTester = new TreadleTester(s)
+    "Something" should "do something" in {
+        val s = chisel3.Driver.emit(() => LazyModule(new ScratchpadTest(OpcodeSet.custom3)).module)
+        implicit val tester: TreadleTester = new TreadleTester(s)
 
-    tester.engine.makeVCDLogger("results/treadlevcd.vcd", showUnderscored = true)
+        tester.engine.makeVCDLogger("results/treadlevcd.vcd", showUnderscored = true)
 
 
-    val mem_array = Array.ofDim[String](8)
-    mem_array.zipWithIndex.foreach { case (mem, k) => mem_array(k) = "ram.mem_" + k
-      val fileName = "memdata/memdata_" + k + ".txt"
-      loadMemFromFile(fileName, mem_array(k))
+        val mem_array = Array.ofDim[String](8)
+        mem_array.zipWithIndex.foreach { case (mem, k) => mem_array(k) = "ram.mem_" + k
+            val fileName = "memdata/memdata_" + k + ".txt"
+            loadMemFromFile(fileName, mem_array(k))
+        }
+
+        // set up memory
+        // val mem = "ram.mem_0"
+        // loadMemFromFile("memdata/memdata_0.txt", mem)
+
+        // start compression
+        tester.poke("io_cmd_bits_inst_funct", 2)
+        tester.poke("io_cmd_bits_rs1", 100)
+        tester.poke("io_cmd_valid", 1)
+        tester.step()
+        tester.poke("io_cmd_bits_inst_funct", 0)
+        tester.poke("io_cmd_bits_rs1", 0)
+        tester.poke("io_cmd_bits_rs2", 100)
+        tester.step()
+        tester.poke("io_cmd_valid", 0)
+
+        //do testing
+        var dump: Seq[BigInt] = Seq()
+
+        for (i <- 0 until 500) {
+            tester.step()
+            val newDump = read128Mem(mem_array(0))
+            if (dump != newDump) {
+                dump = newDump
+                println("Cycle " + i)
+                dump128Mem(mem_array(0))
+            }
+        }
+
+        tester.engine.writeVCD()
     }
-
-    // set up memory
-    // val mem = "ram.mem_0"
-    // loadMemFromFile("memdata/memdata_0.txt", mem)
-
-    // start compression
-    tester.poke("io_cmd_bits_inst_funct", 2)
-    tester.poke("io_cmd_bits_rs1", 100)
-    tester.poke("io_cmd_valid", 1)
-    tester.step()
-    tester.poke("io_cmd_bits_inst_funct", 0)
-    tester.poke("io_cmd_bits_rs1", 0)
-    tester.poke("io_cmd_bits_rs2", 100)
-    tester.step()
-    tester.poke("io_cmd_valid", 0)
-
-    //do testing
-    var dump: Seq[BigInt] = Seq()
-
-    for (i <- 0 until 500) {
-      tester.step()
-      val newDump = read128Mem(mem_array(0))
-      if (dump != newDump) {
-        dump = newDump
-        println("Cycle " + i)
-        dump128Mem(mem_array(0))
-      }
-    }
-
-    tester.engine.writeVCD()
-  }
 }
