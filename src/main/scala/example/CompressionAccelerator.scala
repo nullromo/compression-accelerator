@@ -71,9 +71,9 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     val inputLimit: UInt = inputEnd - kInputMarginBytes
 
     // valid match found
-    val realMatchFound = Wire(Bool())
+    val realMatchFound: Bool = Wire(Bool())
     // remain logic
-    val remain = Wire(UInt(64.W))
+    val remain: UInt = Wire(UInt(64.W))
     // prev_copyBusy
     val prev_copyBusy = RegInit(false.B)
     val prev_startReady = RegInit(true.B)
@@ -83,7 +83,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     val streamcounter = RegInit(0.U(4.W))
     val streamholder = RegInit(VecInit(Seq.fill(16)(0.U(8.W))))
     val streamEmpty = RegInit(false.B)
-    val forceEmit = Wire(Bool())
+    val forceEmit: Bool = Wire(Bool())
     val emptySpotCounter = RegInit(0.U(3.W))
     val emptySpotAddr = RegInit(0.U(log2Ceil(params.scratchpadEntries).W))
 
@@ -127,6 +127,8 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     aligner.io.readDataIO.address.valid := true.B
     aligner.io.readCandidateIO.address.valid := true.B
 
+    aligner.io.equal := true.B //TODO: what does this signal do?
+
     /*
     * Match finder
     */
@@ -150,26 +152,33 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     matchFinder.io.start.valid := memoryctrlIO.readScratchpadReady && (!copyEmitter.io.copyBusy || (copyEmitter.io.copyBusy && copyEmitter.io.copyCompressed.valid))
     matchFinder.io.start.bits := DontCare
     forceEmit := ((matchB - nextEmit) > 59.U)
+    matchFinder.io.matchA.ready := true.B
 
     /*
     * Copy emitter
     */
     // send the comparison data into the copyEmitter
-    (copyEmitter.io.candidate zip aligner.io.readCandidateIO.data.bits.asTypeOf(Vec(4, UInt(8.W)))).foreach{case (cand, io) => cand.bits := io}
-    (copyEmitter.io.data zip aligner.io.readDataIO.data.bits.asTypeOf(Vec(4, UInt(8.W)))).foreach{case(data, io) => data.bits := io}
-    when(memoryctrlIO.readScratchpadReady && (remain >= 4.U) && aligner.io.readDataIO.data.valid){
-        copyEmitter.io.candidate.foreach((a) => a.valid := true.B)
-        copyEmitter.io.data.foreach((a) => a.valid := true.B)
-    }
-    .elsewhen(memoryctrlIO.readScratchpadReady && aligner.io.readDataIO.data.valid){
-        copyEmitter.io.candidate.zipWithIndex.foreach{case (a,i) => when(i.U < remain){a.valid := true.B}
-                                                                     .otherwise(a.valid := false.B)}
-        copyEmitter.io.data.zipWithIndex.foreach{case (a,i) =>  when(i.U < remain){a.valid := true.B}
-                                                                     .otherwise(a.valid := false.B)}
+    (copyEmitter.io.candidate zip aligner.io.readCandidateIO.data.bits.asTypeOf(Vec(4, UInt(8.W)))).foreach{case (cand, aio) => cand.bits := aio}
+    (copyEmitter.io.data zip aligner.io.readDataIO.data.bits.asTypeOf(Vec(4, UInt(8.W)))).foreach{case(data, aio) => data.bits := aio}
+    when(memoryctrlIO.readScratchpadReady && aligner.io.readDataIO.data.valid) {
+        (copyEmitter.io.candidate zip copyEmitter.io.data).zipWithIndex.foreach({
+            case ((a, b), i) =>
+                a.valid := Mux(i.U < remain || remain >= 4.U, true.B, false.B)
+                b.valid := Mux(i.U < remain || remain >= 4.U, true.B, false.B)
+        })
+    }.otherwise {
+        (copyEmitter.io.candidate zip copyEmitter.io.data).foreach({
+            case (a, b) =>
+                a.valid := false.B
+                b.valid := false.B
+        })
     }
     copyEmitter.io.offset.bits := offset
+    copyEmitter.io.offset.valid := true.B //TODO: is this right? Probably not.
     copyEmitter.io.hit := realMatchFound
     copyEmitter.io.remain := remain
+    copyEmitter.io.bufferPtrInc.ready := true.B
+    copyEmitter.io.copyCompressed.ready := true.B
 
     /* 
     * memory controller
@@ -286,7 +295,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
         // shifte stream holder when a cache line is full
         when(streamcounter > 7.U){
             (streamholder.slice(0,8) zip streamholder.slice(8,16)).foreach{case(a,b) => a := b}
-            streamholder.slice(8,16).foreach((a) => a := 0.U)
+            streamholder.slice(8,16).foreach(a => a := 0.U)
         }
     }
 
@@ -360,7 +369,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
             busy := true.B
             src := cmd.bits.rs1
             dst := cmd.bits.rs2
-            mask := (255).U
+            mask := 255.U
             streamcounter := 0.U
             streamholder.foreach(_ := 0.U)
             streamEmpty := true.B

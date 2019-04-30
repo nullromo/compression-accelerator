@@ -273,6 +273,7 @@ class Scratchpad(
       bank.io.write.en := bankwen || write.en
       bank.io.write.addr := Mux(bankwen, req.spaddr, write.addr)
       bank.io.write.data := Mux(bankwen, rowBuffer.asUInt, write.data)
+      bank.io.write.mask := Mux(bankwen, 255.U.asTypeOf(Vec(8, Bool())), write.mask)
     }
 
     when (io.dma.req.fire()) {
