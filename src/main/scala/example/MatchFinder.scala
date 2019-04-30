@@ -90,7 +90,7 @@ class MatchFinderTestModule(memDataWidth: Int, dataWidth: Int, addressWidth: Int
     matchFinder.io.clear := false.B
 
     // create a memory
-    val mem = Mem(4096, UInt(memDataWidth.W))
+    val mem = SyncReadMem(4096, UInt(memDataWidth.W))
     loadMemoryFromFile(mem, "data/alignerTestData.txt")
 
     // create memory aligner adapter
