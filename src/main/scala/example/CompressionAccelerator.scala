@@ -219,83 +219,71 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
                     when(streamcounter <= 7.U) {
                         streamcounter := streamcounter + 2.U
                         streamholder(streamcounter + 1.U) := aligner.io.readDataIO.data.bits(7, 0)
+                    }.otherwise {
+                        streamcounter := streamcounter - 6.U
+                        streamholder(streamcounter - 7.U) := aligner.io.readDataIO.data.bits(7, 0)
                     }
-                        .otherwise {
-                            streamcounter := streamcounter - 6.U
-                            streamholder(streamcounter - 7.U) := aligner.io.readDataIO.data.bits(7, 0)
-                        }
-                }
-                    .otherwise {
-                        when(streamcounter <= 7.U) {
-                            streamcounter := streamcounter + 1.U
-                        }
-                            .otherwise {
-                                streamcounter := streamcounter - 7.U
-                            }
-                    }
-            }
-                .otherwise {
+                }.otherwise {
                     when(streamcounter <= 7.U) {
                         streamcounter := streamcounter + 1.U
-                        streamholder(streamcounter) := aligner.io.readDataIO.data.bits(7, 0)
+                    }.otherwise {
+                        streamcounter := streamcounter - 7.U
                     }
-                        .otherwise {
-                            streamcounter := streamcounter - 7.U
-                            streamholder(streamcounter - 8.U) := aligner.io.readDataIO.data.bits(7, 0)
-                        }
                 }
-        }
-            .elsewhen(copyEmitter.io.copyCompressed.fire()) {
-                when(copyEmitter.io.copyCompressed.bits.tag === 1.U) {
-                    when(streamcounter <= 7.U) {
-                        streamcounter := streamcounter + 2.U
-                        streamholder(streamcounter) := copyEmitter.io.copyCompressed.bits.copy(7, 0)
-                        streamholder(streamcounter + 1.U) := copyEmitter.io.copyCompressed.bits.copy(15, 8)
-                    }
-                        .otherwise {
-                            streamcounter := streamcounter - 6.U
-                            streamholder(streamcounter - 8.U) := copyEmitter.io.copyCompressed.bits.copy(7, 0)
-                            streamholder(streamcounter - 7.U) := copyEmitter.io.copyCompressed.bits.copy(15, 8)
-                        }
+            }.otherwise {
+                when(streamcounter <= 7.U) {
+                    streamcounter := streamcounter + 1.U
+                    streamholder(streamcounter) := aligner.io.readDataIO.data.bits(7, 0)
+                }.otherwise {
+                    streamcounter := streamcounter - 7.U
+                    streamholder(streamcounter - 8.U) := aligner.io.readDataIO.data.bits(7, 0)
                 }
-                    .elsewhen(copyEmitter.io.copyCompressed.bits.tag === 2.U) {
-                        when(streamcounter <= 7.U) {
-                            streamcounter := streamcounter + 3.U
-                            streamholder(streamcounter) := copyEmitter.io.copyCompressed.bits.copy(7, 0)
-                            streamholder(streamcounter + 1.U) := copyEmitter.io.copyCompressed.bits.copy(15, 8)
-                            streamholder(streamcounter + 2.U) := copyEmitter.io.copyCompressed.bits.copy(23, 16)
-                        }
-                            .otherwise {
-                                streamcounter := streamcounter - 5.U
-                                streamholder(streamcounter - 8.U) := copyEmitter.io.copyCompressed.bits.copy(7, 0)
-                                streamholder(streamcounter - 7.U) := copyEmitter.io.copyCompressed.bits.copy(15, 8)
-                                streamholder(streamcounter - 6.U) := copyEmitter.io.copyCompressed.bits.copy(23, 16)
-                            }
-                    }
-                    .elsewhen(copyEmitter.io.copyCompressed.bits.tag === 3.U) {
-                        when(streamcounter <= 7.U) {
-                            streamcounter := streamcounter + 5.U
-                            streamholder(streamcounter) := copyEmitter.io.copyCompressed.bits.copy(7, 0)
-                            streamholder(streamcounter + 1.U) := copyEmitter.io.copyCompressed.bits.copy(15, 8)
-                            streamholder(streamcounter + 2.U) := copyEmitter.io.copyCompressed.bits.copy(23, 16)
-                            streamholder(streamcounter + 3.U) := copyEmitter.io.copyCompressed.bits.copy(31, 24)
-                            streamholder(streamcounter + 4.U) := copyEmitter.io.copyCompressed.bits.copy(39, 32)
-                        }
-                            .otherwise {
-                                streamcounter := streamcounter - 3.U
-                                streamholder(streamcounter - 8.U) := copyEmitter.io.copyCompressed.bits.copy(7, 0)
-                                streamholder(streamcounter - 7.U) := copyEmitter.io.copyCompressed.bits.copy(15, 8)
-                                streamholder(streamcounter - 6.U) := copyEmitter.io.copyCompressed.bits.copy(23, 16)
-                                streamholder(streamcounter - 5.U) := copyEmitter.io.copyCompressed.bits.copy(31, 24)
-                                streamholder(streamcounter - 4.U) := copyEmitter.io.copyCompressed.bits.copy(39, 32)
-                            }
-                    }
-                    .otherwise {
-                        when(streamcounter > 7.U) {
-                            streamcounter := streamcounter - 8.U
-                        }
-                    }
             }
+        }.elsewhen(copyEmitter.io.copyCompressed.fire()) {
+            when(copyEmitter.io.copyCompressed.bits.tag === 1.U) {
+                when(streamcounter <= 7.U) {
+                    streamcounter := streamcounter + 2.U
+                    streamholder(streamcounter) := copyEmitter.io.copyCompressed.bits.copy(7, 0)
+                    streamholder(streamcounter + 1.U) := copyEmitter.io.copyCompressed.bits.copy(15, 8)
+                }.otherwise {
+                    streamcounter := streamcounter - 6.U
+                    streamholder(streamcounter - 8.U) := copyEmitter.io.copyCompressed.bits.copy(7, 0)
+                    streamholder(streamcounter - 7.U) := copyEmitter.io.copyCompressed.bits.copy(15, 8)
+                }
+            }.elsewhen(copyEmitter.io.copyCompressed.bits.tag === 2.U) {
+                when(streamcounter <= 7.U) {
+                    streamcounter := streamcounter + 3.U
+                    streamholder(streamcounter) := copyEmitter.io.copyCompressed.bits.copy(7, 0)
+                    streamholder(streamcounter + 1.U) := copyEmitter.io.copyCompressed.bits.copy(15, 8)
+                    streamholder(streamcounter + 2.U) := copyEmitter.io.copyCompressed.bits.copy(23, 16)
+                }.otherwise {
+                    streamcounter := streamcounter - 5.U
+                    streamholder(streamcounter - 8.U) := copyEmitter.io.copyCompressed.bits.copy(7, 0)
+                    streamholder(streamcounter - 7.U) := copyEmitter.io.copyCompressed.bits.copy(15, 8)
+                    streamholder(streamcounter - 6.U) := copyEmitter.io.copyCompressed.bits.copy(23, 16)
+                }
+            }.elsewhen(copyEmitter.io.copyCompressed.bits.tag === 3.U) {
+                when(streamcounter <= 7.U) {
+                    streamcounter := streamcounter + 5.U
+                    streamholder(streamcounter) := copyEmitter.io.copyCompressed.bits.copy(7, 0)
+                    streamholder(streamcounter + 1.U) := copyEmitter.io.copyCompressed.bits.copy(15, 8)
+                    streamholder(streamcounter + 2.U) := copyEmitter.io.copyCompressed.bits.copy(23, 16)
+                    streamholder(streamcounter + 3.U) := copyEmitter.io.copyCompressed.bits.copy(31, 24)
+                    streamholder(streamcounter + 4.U) := copyEmitter.io.copyCompressed.bits.copy(39, 32)
+                }.otherwise {
+                    streamcounter := streamcounter - 3.U
+                    streamholder(streamcounter - 8.U) := copyEmitter.io.copyCompressed.bits.copy(7, 0)
+                    streamholder(streamcounter - 7.U) := copyEmitter.io.copyCompressed.bits.copy(15, 8)
+                    streamholder(streamcounter - 6.U) := copyEmitter.io.copyCompressed.bits.copy(23, 16)
+                    streamholder(streamcounter - 5.U) := copyEmitter.io.copyCompressed.bits.copy(31, 24)
+                    streamholder(streamcounter - 4.U) := copyEmitter.io.copyCompressed.bits.copy(39, 32)
+                }
+            }.otherwise {
+                when(streamcounter > 7.U) {
+                    streamcounter := streamcounter - 8.U
+                }
+            }
+        }
 
         // shifte stream holder when a cache line is full
         when(streamcounter > 7.U) {
@@ -323,22 +311,20 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
         when(matchFinder.io.newData.ready && !memoryctrlIO.outOfRangeFlag) {
             when(!realMatchFound) {
                 matchB := matchB + 1.U // can be changed to skip later, also when match found, matchB should move + 4
+            }.otherwise {
+                matchB := matchB + 4.U // beacause at least 4 bytes should be the same
             }
-                .otherwise {
-                    matchB := matchB + 4.U // beacause at least 4 bytes should be the same
-                }
         }
         when(realMatchFound) {
             matchA := matchFinder.io.matchA.bits + 4.U
             offset := matchB - matchA // offset logic
         }
-    }
-        .otherwise {
-            when(copyEmitter.io.bufferPtrInc.valid && !memoryctrlIO.outOfRangeFlag) {
-                matchB := matchB + copyEmitter.io.bufferPtrInc.bits
-                matchA := matchA + copyEmitter.io.bufferPtrInc.bits
-            }
+    }.otherwise {
+        when(copyEmitter.io.bufferPtrInc.valid && !memoryctrlIO.outOfRangeFlag) {
+            matchB := matchB + copyEmitter.io.bufferPtrInc.bits
+            matchA := matchA + copyEmitter.io.bufferPtrInc.bits
         }
+    }
 
     // ****** remain logic *******
     remain := length - (matchB - minScratchpadAddress)
