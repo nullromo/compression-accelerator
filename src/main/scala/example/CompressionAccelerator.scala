@@ -328,6 +328,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     dontTouch(streamCounter)
     dontTouch(streamHolder)
     dontTouch(streamEmpty)
+    dontTouch(scratchpadIO)
 
     matchFinder.io.clear := cmd.fire()
 
@@ -337,15 +338,4 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     io.resp.bits.rd := RegNext(io.resp.bits.rd)
     io.resp.bits.data := (-1).S(xLen.W).asUInt()
     io.interrupt := false.B
-}
-
-object DMAUtils {
-    def makeDMARequest(write: Bool, virtualAddress: UInt, scratchpadAddress: UInt)(implicit p: Parameters, params: CompressionParameters): ScratchpadMemRequest = {
-        val req = Wire(new ScratchpadMemRequest(params.scratchpadBanks, params.scratchpadEntries))
-        req.vaddr := virtualAddress
-        req.spbank := 0.U
-        req.spaddr := scratchpadAddress
-        req.write := write
-        req
-    }
 }
