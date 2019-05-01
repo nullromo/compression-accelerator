@@ -33,7 +33,19 @@ class CompressionAcceleratorTester(c: ScratchpadTestModule) extends PeekPokeTest
 }
 
 class CompressionAcceleratorSpec extends ChiselFlatSpec {
+<<<<<<< Updated upstream
     implicit val p: Parameters = AcceleratorParams()
+=======
+  implicit val p: Parameters = AcceleratorParams()
+
+  val dutGen: () => ScratchpadTestModule = () => LazyModule(new ScratchpadTest(OpcodeSet.custom3)).module
+  "CompressionAccelerator" should "accept commands" in {
+    Driver.execute(TesterArgs() :+ "CompressionAccelerator", dutGen) {
+      c => new CompressionAcceleratorTester(c)
+    } should be(true)
+  }
+}
+>>>>>>> Stashed changes
 
     val dutGen: () => ScratchpadTestModule = () => LazyModule(new ScratchpadTest(OpcodeSet.custom3)).module
     "CompressionAccelerator" should "accept commands" in {
