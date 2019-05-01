@@ -33,7 +33,7 @@ class ScratchpadTestModule(outer: ScratchpadTest)(implicit p: Parameters) extend
   io.busy := outer.accelerator.module.io.busy
   io.interrupt := outer.accelerator.module.io.interrupt
   outer.accelerator.module.io.exception := io.exception
-  loadMemoryFromFile(outer.ram.module.mem, "memdata/memdata.hex.txt")
+  loadMemoryFromFile(outer.ram.module.mem, "data/alignerTestData.txt")
 
   val ptw = Module(new DummyPTW(1))
   ptw.io.requestors <> outer.accelerator.module.io.ptw

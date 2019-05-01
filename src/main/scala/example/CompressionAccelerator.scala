@@ -122,11 +122,11 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     aligner.io.readDataIO.data.ready := true.B
     aligner.io.readCandidateIO.data.ready := true.B
     // connect the aligner addresses
-    aligner.io.readDataIO.address.bits := matchA
-    aligner.io.readCandidateIO.address.bits := matchB
+    aligner.io.readDataIO.address.bits := matchB
+    aligner.io.readCandidateIO.address.bits := matchA
     // addresses sent to the aligners are always valid, but the aligners may choose not to be ready
-    aligner.io.readDataIO.address.valid := true.B
-    aligner.io.readCandidateIO.address.valid := true.B
+    aligner.io.readDataIO.address.valid := !memoryctrlIO.readScratchpadReady
+    aligner.io.readCandidateIO.address.valid := !memoryctrlIO.readScratchpadReady
 
     aligner.io.equal := true.B //TODO: what does this signal do?
 
@@ -201,6 +201,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     // -- encode end when : in literal mode, remain is 0; in copy mode, copy is not busy anymore
     memoryctrlIO.endEncode := (remain === 0.U) && (!copyEmitter.io.copyBusy)
     memoryctrlIO.storeData.valid := !memoryctrlIO.fullSW && (streamCounter > 7.U) /// needs to check !!!!!!!!!!!!
+	scratchpadIO.dma <> memoryctrlIO.dma
 
     // when stream is true, bytes read from the read bank will be sent into the write bank
     val stream = RegInit(true.B)
@@ -261,7 +262,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     prev_startReady := matchFinder.io.start.ready
     prev_forceEmit := forceEmit
 
-    when(!copyEmitter.io.copyBusy) {
+    when(!copyEmitter.io.copyBusy && memoryctrlIO.readScratchpadReady) {
         when(matchFinder.io.newData.ready && !memoryctrlIO.outOfRangeFlag) {
             when(!realMatchFound) {
                 matchB := matchB + 1.U // can be changed to skip later, also when match found, matchB should move + 4
@@ -273,7 +274,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
             matchA := matchFinder.io.matchA.bits + 4.U
             offset := matchB - matchA // offset logic
         }
-    }.otherwise {
+    }.elsewhen(memoryctrlIO.readScratchpadReady) {
         when(copyEmitter.io.bufferPtrInc.valid && !memoryctrlIO.outOfRangeFlag) {
             matchB := matchB + copyEmitter.io.bufferPtrInc.bits
             matchA := matchA + copyEmitter.io.bufferPtrInc.bits
@@ -306,7 +307,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
             nextEmit := cmd.bits.rs1
             nextEmitValid := true.B
             matchA := cmd.bits.rs1
-            matchB := cmd.bits.rs1 + 1.U
+            matchB := cmd.bits.rs1
             matchFinder.io.start.valid := true.B
             busy := true.B
             src := cmd.bits.rs1

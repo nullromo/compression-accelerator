@@ -110,7 +110,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
         io.dma.req.bits.spaddr := Mux(stateDMA === s_dma_read, tailLDp, headSWp)
         io.dma.req.bits.spbank := Mux(stateDMA === s_dma_read, 0.U, 1.U)
         io.dma.req.bits.write := stateDMA === s_dma_write
-        io.dma.req.valid := ((stateDMA === s_dma_read && !fullLD && !fullSW) || (stateDMA === s_dma_write && ((!emptySW && !io.emitEmptyBytePos.valid) || (headSWp =/= (io.emitEmptyBytePos.bits /dataBytes.U) && io.emitEmptyBytePos.valid) )))
+        io.dma.req.valid := ((stateDMA === s_dma_read && !(fullLD || (maxLDvAddr - minLDvAddr >= io.length)) && !fullSW) || (stateDMA === s_dma_write && ((!emptySW && !io.emitEmptyBytePos.valid) || (headSWp =/= (io.emitEmptyBytePos.bits /dataBytes.U) && io.emitEmptyBytePos.valid) )))
         io.dma.resp.ready := true.B
 
         // connect the rest of the output
