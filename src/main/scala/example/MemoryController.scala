@@ -107,7 +107,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
         // -- When loading data, virtual address should be maxLDvAddr, spaddress should be tail ptr, and bank is 0
         // -- When writing data, virtual address should be maxSWvAddr, spaddress should be tail ptr, and bank is 1
         io.dma.req.bits.vaddr := Mux(stateDMA === s_dma_read, maxLDvAddr, maxSWvAddr)
-        io.dma.req.bits.spaddr := Mux(stateDMA === s_dma_read, tailLDp, headSWp)
+        io.dma.req.bits.spaddr := Mux(stateDMA === s_dma_read, Mux(emptyLD, headLDp, tailLDp), headSWp)
         io.dma.req.bits.spbank := Mux(stateDMA === s_dma_read, 0.U, 1.U)
         io.dma.req.bits.write := stateDMA === s_dma_write
         io.dma.req.valid := ((stateDMA === s_dma_read && !(fullLD || (maxLDvAddr - minLDvAddr >= io.length)) && !fullSW) || (stateDMA === s_dma_write && ((!emptySW && !io.emitEmptyBytePos.valid) || (headSWp =/= (io.emitEmptyBytePos.bits /dataBytes.U) && io.emitEmptyBytePos.valid) )))
