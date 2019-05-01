@@ -10,3 +10,6 @@
 [submodule "icenet"]
 	path = icenet
 	url = https://github.com/firesim/icenet
+[submodule "tests/snappy"]
+	path = tests/snappy
+	url = https://github.com/google/snappy
