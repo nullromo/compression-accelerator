@@ -3,7 +3,7 @@
 #include <iostream>
 #include "snappy/snappy.h"
 
-//const char* original_data = "The quick brown fox jumps over the lazy dog. If Tid the thistle sifter lifts his sieve of sifted thistles, he'll shift the thistles in his sifting sieve to live unsifted.";
+//const char* original_data = "The quick brown fox jumps over the lazy dog. If Tid the thistle sifter lifts his sieve of sifted thistles, then he'll shift the thistles in his sifting sieve to live unsifted.";
 //const char* original_data = "This is an example string. It is filled with all sorts of examply data and stuff. Look at all the byes. Wow. There are so many. This is the best data I have ever seen, and I am so happy that I am alive on this earth. Computers are great. When a computer processes data, it is a very great thing. There is so much data processing that needs to happen and it is all done by a computer. Wow.....";
 const char* original_data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 std::string compressed_data;
@@ -19,7 +19,7 @@ void print_compressed_data(std::string data, size_t length)
     std::cout << "\n\n";
 }
 
-int main(int argc, char* argv[])
+int basic_test(int argc, char* argv[])
 {
     std::cout << "Original (" << strlen(original_data) << " bytes):\n";
     std::cout << original_data << "\n\n";
@@ -36,4 +36,12 @@ int main(int argc, char* argv[])
         std::cout << recovered_data << "\n\n";
     }
     return 0;
+}
+
+int main(int argc, char* argv[])
+{
+    const std::string input = "If Tid the thistle sifter lifts his sieve of sifted thistles, then he'll shift the thistles in his sifting sieve to live unsifted.";
+    std::string output;
+    size_t compressed_length = snappy::Compress(input.data(), input.size(), &output);
+//  basic_test(argc, argv);
 }
