@@ -3,7 +3,7 @@ package example
 import chisel3._
 import chisel3.core.dontTouch
 import chisel3.util._
-import external.{FrontendTLB, Scratchpad, ScratchpadMemRequest}
+import external.{FrontendTLB, Scratchpad}
 import freechips.rocketchip.config.Parameters
 import freechips.rocketchip.diplomacy.LazyModule
 import freechips.rocketchip.tile._
@@ -17,7 +17,7 @@ case class CompressionParameters(hashTableSize: Int,
 }
 
 object DefaultCompressionParameters extends CompressionParameters(
-    hashTableSize = 4096,
+    hashTableSize = 512,
     scratchpadBanks = 2,
     scratchpadEntries = 128,
     scratchpadWidth = 64)
@@ -208,7 +208,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     val stream = RegInit(true.B)
 
     // stream searched bytes through to the write bank
-    scratchpadIO.write(1).en := ((streamCounter > 7.U) || forceEmit) && !memoryctrlIO.fullSW
+    scratchpadIO.write(1).en := ((streamCounter > 7.U) || forceEmit || matchFinder.io.matchA.valid) && !memoryctrlIO.fullSW
     scratchpadIO.write(1).data := Mux(forceEmit || matchFinder.io.matchA.valid, ((matchB - nextEmit) << 2.U).asTypeOf(UInt(64.W)), streamHolder.asTypeOf(UInt(128.W))(63, 0))
     scratchpadIO.write(1).addr := Mux(forceEmit || matchFinder.io.matchA.valid, emptySpotAddr, memoryctrlIO.storeSpAddr)
     scratchpadIO.write(1).mask := Mux(forceEmit || matchFinder.io.matchA.valid, (1.U << emptySpotCounter).asTypeOf(Vec(8, Bool())), 255.U.asTypeOf(Vec(8, Bool())))
@@ -263,22 +263,24 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     prev_startReady := matchFinder.io.start.ready
     prev_forceEmit := forceEmit
 
-    when(!copyEmitter.io.copyBusy && memoryctrlIO.readScratchpadReady && aligner.io.readDataIO.address.ready) {
-        when(matchFinder.io.newData.ready && !memoryctrlIO.outOfRangeFlag) {
-            when(!realMatchFound) {
-                matchB := matchB + 1.U // can be changed to skip later, also when match found, matchB should move + 4
-            }.otherwise {
-                matchB := matchB + 4.U // beacause at least 4 bytes should be the same
+    when(memoryctrlIO.readScratchpadReady) {
+        when(!copyEmitter.io.copyBusy && aligner.io.readDataIO.address.ready) {
+            when(matchFinder.io.newData.ready && !memoryctrlIO.outOfRangeFlag) {
+                when(!realMatchFound) {
+                    matchB := matchB + 1.U // can be changed to skip later, also when match found, matchB should move + 4
+                }.otherwise {
+                    matchB := matchB + 4.U // because at least 4 bytes should be the same
+                }
             }
-        }
-        when(realMatchFound) {
-            matchA := matchFinder.io.matchA.bits + 4.U
-            offset := matchB - matchA // offset logic
-        }
-    }.elsewhen(memoryctrlIO.readScratchpadReady) {
-        when(copyEmitter.io.bufferPtrInc.valid && !memoryctrlIO.outOfRangeFlag) {
-            matchB := matchB + copyEmitter.io.bufferPtrInc.bits
-            matchA := matchA + copyEmitter.io.bufferPtrInc.bits
+            when(realMatchFound) {
+                matchA := matchFinder.io.matchA.bits + 4.U
+                offset := matchB - matchA // offset logic
+            }
+        }.otherwise {
+            when(copyEmitter.io.bufferPtrInc.valid && !memoryctrlIO.outOfRangeFlag) {
+                matchB := matchB + copyEmitter.io.bufferPtrInc.bits
+                matchA := matchA + copyEmitter.io.bufferPtrInc.bits
+            }
         }
     }
 
@@ -339,15 +341,4 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     io.resp.bits.rd := RegNext(io.resp.bits.rd)
     io.resp.bits.data := (-1).S(xLen.W).asUInt()
     io.interrupt := false.B
-}
-
-object DMAUtils {
-    def makeDMARequest(write: Bool, virtualAddress: UInt, scratchpadAddress: UInt)(implicit p: Parameters, params: CompressionParameters): ScratchpadMemRequest = {
-        val req = Wire(new ScratchpadMemRequest(params.scratchpadBanks, params.scratchpadEntries))
-        req.vaddr := virtualAddress
-        req.spbank := 0.U
-        req.spaddr := scratchpadAddress
-        req.write := write
-        req
-    }
 }
