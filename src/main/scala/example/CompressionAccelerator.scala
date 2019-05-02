@@ -257,7 +257,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     // ----- need to check whether the hit is valid or not: if address < minvAddr + 8 (to keep aligner and controller working properly, two lines cannot be used)
     // -- when finding copy, matchA should be increased the same way as dataPtr
 
-    realMatchFound := matchFinder.io.matchA.valid && (matchFinder.io.matchA.bits >= memoryctrlIO.minvAddr + 8.U)
+    realMatchFound := matchFinder.io.matchA.valid && !(memoryctrlIO.outOfRangeFlag && matchFinder.io.matchA.bits < memoryctrlIO.minvAddr + 8.U)
     prev_copyBusy := copyEmitter.io.copyBusy
     prev_startReady := matchFinder.io.start.ready
     prev_forceEmit := forceEmit
