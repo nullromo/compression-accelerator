@@ -24,6 +24,7 @@ class MemoryControllerIO(val nRows: Int, val dataBytes: Int)(implicit p: Paramet
     val matchFound = Input(Bool())                          // whether a match is found
     val equal = Input(Bool())                               // whether the data stream is still in copy mode (from copy datapath)
     val endEncode = Input(Bool())                           // all encoding is finished
+	val remain = Input(UInt(64.W))							// how many bytes left to be encoded
 
     // -- Input from store queue
     val storeData = Flipped(Decoupled(UInt((8*dataBytes).W))) // compressed data stream
@@ -78,7 +79,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
         val outOfRange = Wire(Bool())
 
         endLoad := (maxLDvAddr >= (io.readBaseAddr + io.length))
-        outOfRange := (io.matchB === (((tailLDp-1.U) * dataBytes.U) - 1.U)) // need at least two lines to make aligner working properly
+        outOfRange := (io.matchB === (((tailLDp-1.U) * dataBytes.U) - 1.U)) && (io.remain >= dataBytes.U) // need at least two lines to make aligner working properly and not reaching the end of processing
         io.outOfRangeFlag := outOfRange
 
         // min virtual address

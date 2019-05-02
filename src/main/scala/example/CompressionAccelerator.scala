@@ -197,6 +197,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     memoryctrlIO.emitEmptyBytePos.bits := emptySpotAddr * 8.U + emptySpotCounter
     memoryctrlIO.emitEmptyBytePos.valid := nextEmitValid
     memoryctrlIO.matchFound := realMatchFound
+	memoryctrlIO.remain := remain
     memoryctrlIO.equal := copyEmitter.io.equal
     // -- encode end when : in literal mode, remain is 0; in copy mode, copy is not busy anymore
     memoryctrlIO.endEncode := (remain === 0.U) && (!copyEmitter.io.copyBusy)
