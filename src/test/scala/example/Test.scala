@@ -94,42 +94,44 @@ class TreadleTest extends FlatSpec with Matchers {
         val s = chisel3.Driver.emit(() => LazyModule(new ScratchpadTest(OpcodeSet.custom3)).module)
         implicit val tester: TreadleTester = new TreadleTester(s)
 
-        tester.engine.makeVCDLogger("results/treadlevcd.vcd", showUnderscored = true)
+        tester.engine.makeVCDLogger("results/treadle-CompressionAccelerator.vcd", showUnderscored = true)
 
-
+        //load initial memory
         val mem_array = Array.ofDim[String](8)
         mem_array.zipWithIndex.foreach { case (mem, k) => mem_array(k) = "ram.mem_" + k
-            val fileName = "memdata/memdata_" + k + ".txt"
+            val fileName = "data/alignerTestData_" + k + ".txt"
             loadMemFromFile(fileName, mem_array(k))
         }
 
-        // set up memory
-        // val mem = "ram.mem_0"
-        // loadMemFromFile("memdata/memdata_0.txt", mem)
-
         // start compression
+        //set length: 100
         tester.poke("io_cmd_bits_inst_funct", 2)
         tester.poke("io_cmd_bits_rs1", 100)
         tester.poke("io_cmd_valid", 1)
         tester.step()
+        //compress from address 0 into address 100
         tester.poke("io_cmd_bits_inst_funct", 0)
         tester.poke("io_cmd_bits_rs1", 0)
         tester.poke("io_cmd_bits_rs2", 100)
         tester.step()
+        //stop sending commands
         tester.poke("io_cmd_valid", 0)
 
         //do testing
-        var dump: Seq[BigInt] = Seq()
+        var dump: List[BigInt] = List()
 
-        for (i <- 0 until 500) {
+        for (i <- 0 until 2000) {
             tester.step()
-            val newDump = read128Mem(mem_array(0))
+            val newDump = readMem(mem_array, 200, 8)
+            if(i % 200 == 0 && i != 0)
+                println("Cycle " + i)
             if (dump != newDump) {
                 dump = newDump
                 println("Cycle " + i)
-                dump128Mem(mem_array(0))
+                dumpMem(dump)
             }
         }
+        println()
 
         tester.engine.writeVCD()
     }

@@ -35,19 +35,21 @@ object AcceleratorParams {
 
 object TreadleTesterMemFunctions {
   // returns the first 128 bytes of a memory
-  def read128Mem(mem: String)(implicit tester: TreadleTester): Seq[BigInt] = {
-    var arr: Seq[BigInt] = Seq()
-    for(i <- 0 until 128) {
-      arr = arr :+ tester.peekMemory(mem, i)
+  def readMem(mem: Array[String], length: Int, banks: Int)(implicit tester: TreadleTester): List[BigInt] = {
+    var arr: List[BigInt] = List()
+    for(i <- 0 until length/banks) {
+      for(bank <- 0 until banks) {
+        arr = arr :+ tester.peekMemory(mem(bank), i)
+      }
     }
     arr
   }
 
   // prints the first 128 bytes of a memory
-  def dump128Mem(mem: String)(implicit tester: TreadleTester): Unit = {
-    for(i <- 0 until 128) {
+  def dumpMem(data: List[BigInt])(implicit tester: TreadleTester): Unit = {
+    for(i <- data.indices) {
       print(if(i%8==0) "\n" else " ")
-      print(tester.peekMemory(mem, i))
+      print("%2x".format(data(i)))
     }
     println("")
   }
@@ -55,7 +57,7 @@ object TreadleTesterMemFunctions {
   // loads data into a memory from a file
   def loadMemFromFile(filename: String, mem: String)(implicit tester: TreadleTester): Unit = {
     for((element, index) <- Source.fromFile(filename).getLines().zipWithIndex) {
-      tester.pokeMemory(mem, index, element.toInt)
+      tester.pokeMemory(mem, index, Integer.parseInt(element, 16))
     }
   }
 }
