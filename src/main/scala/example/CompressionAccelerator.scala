@@ -262,7 +262,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     prev_startReady := matchFinder.io.start.ready
     prev_forceEmit := forceEmit
 
-    when(!copyEmitter.io.copyBusy && memoryctrlIO.readScratchpadReady) {
+    when(!copyEmitter.io.copyBusy && memoryctrlIO.readScratchpadReady && aligner.io.readDataIO.address.ready) {
         when(matchFinder.io.newData.ready && !memoryctrlIO.outOfRangeFlag) {
             when(!realMatchFound) {
                 matchB := matchB + 1.U // can be changed to skip later, also when match found, matchB should move + 4
