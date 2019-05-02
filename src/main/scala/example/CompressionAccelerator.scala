@@ -3,7 +3,7 @@ package example
 import chisel3._
 import chisel3.core.dontTouch
 import chisel3.util._
-import external.{FrontendTLB, Scratchpad, ScratchpadMemRequest}
+import external.{FrontendTLB, Scratchpad}
 import freechips.rocketchip.config.Parameters
 import freechips.rocketchip.diplomacy.LazyModule
 import freechips.rocketchip.tile._
@@ -17,7 +17,7 @@ case class CompressionParameters(hashTableSize: Int,
 }
 
 object DefaultCompressionParameters extends CompressionParameters(
-    hashTableSize = 4096,
+    hashTableSize = 512,
     scratchpadBanks = 2,
     scratchpadEntries = 128,
     scratchpadWidth = 64)
@@ -267,7 +267,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
             when(!realMatchFound) {
                 matchB := matchB + 1.U // can be changed to skip later, also when match found, matchB should move + 4
             }.otherwise {
-                matchB := matchB + 4.U // beacause at least 4 bytes should be the same
+                matchB := matchB + 4.U // because at least 4 bytes should be the same
             }
         }
         when(realMatchFound) {
@@ -338,15 +338,4 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     io.resp.bits.rd := RegNext(io.resp.bits.rd)
     io.resp.bits.data := (-1).S(xLen.W).asUInt()
     io.interrupt := false.B
-}
-
-object DMAUtils {
-    def makeDMARequest(write: Bool, virtualAddress: UInt, scratchpadAddress: UInt)(implicit p: Parameters, params: CompressionParameters): ScratchpadMemRequest = {
-        val req = Wire(new ScratchpadMemRequest(params.scratchpadBanks, params.scratchpadEntries))
-        req.vaddr := virtualAddress
-        req.spbank := 0.U
-        req.spaddr := scratchpadAddress
-        req.write := write
-        req
-    }
 }
