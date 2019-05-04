@@ -30,6 +30,7 @@ class MemoryReadAligner(readAddressWidth: Int, readDataWidth: Int, memAddressWid
     val readCandidateIO = new DecoupledMemoryAlignerIO(readAddressWidth, readDataWidth)
     val memCandidateIO = Flipped(new MemoryAlignerIO(memAddressWidth, memDataWidth))
     val equal = Input(Bool())
+	val hit = Input(Bool())
   })
 
   // special case for beginning
@@ -116,7 +117,7 @@ class MemoryReadAligner(readAddressWidth: Int, readDataWidth: Int, memAddressWid
 
 
   io.memCandidateIO.address := Mux(!initializedCandidate || (initializedCandidate && !initializedCandidate_prev), 
-                                    Mux(memRespCandidate, io.readCandidateIO.address.bits / memBytes.U, upperReadAddress_candidate), 
+                                    Mux(!memRespCandidate, io.readCandidateIO.address.bits / memBytes.U, upperReadAddress_candidate), 
                                     upperReadAddress_candidate+1.U)
   io.memCandidateIO.en := Mux(!initializedCandidate || (initializedCandidate && !initializedCandidate_prev), io.readCandidateIO.address.valid || memRespCandidate, shiftCandidate)
   io.readCandidateIO.data.valid := io.readCandidateIO.address.valid && readyCandidate(0) && readyCandidate(1)
@@ -217,7 +218,7 @@ class MemoryReadAligner(readAddressWidth: Int, readDataWidth: Int, memAddressWid
     })
   )
 
-  when(!io.equal){
+  when(io.hit){
     initializedCandidate := false.B
     readyCandidate.foreach{a => a := false.B}
   }
@@ -247,4 +248,5 @@ class MemoryReadAlignerTestModule(readAddressWidth: Int, readDataWidth: Int, mem
   aligner.io.readCandidateIO.data.ready := true.B
   aligner.io.memCandidateIO.data := 0.U
   aligner.io.equal := false.B
+  aligner.io.hit := false.B
 }
