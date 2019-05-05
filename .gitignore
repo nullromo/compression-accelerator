@@ -18,3 +18,5 @@ verisim/DVEfiles/
 verisim/opendatabase.log
 memdata/*
 !memdata/.gitkeep
+benchmark-data/*
+!benchmark-data/.gitkeep
