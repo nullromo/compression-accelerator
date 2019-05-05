@@ -115,7 +115,14 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     val aligner = Module(new MemoryReadAligner(
         32, 32, 32, 64
     ))
-    // connect the aligners to the memory
+    val matchFinder = Module(new MatchFinder(params.scratchpadWidth, 32, params.hashTableSize))
+    // instantiate the module that does the copy length check
+    val copyEmitter = Module(new CopyCompress(new CopyCompressParams {
+        val parallellane = 4
+    }))
+
+
+	// connect the aligners to the memory
     scratchpadIO.read(0)(0).addr := (aligner.io.memDataIO.address - src) % (params.scratchpadEntries * params.scratchpadWidth / 8).U
     scratchpadIO.read(0)(1).addr := (aligner.io.memCandidateIO.address - src) % (params.scratchpadEntries * params.scratchpadWidth / 8).U
     scratchpadIO.read(0)(0).en := aligner.io.memDataIO.en
@@ -132,18 +139,13 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     aligner.io.readDataIO.address.valid := memoryctrlIO.readScratchpadReady
     aligner.io.readCandidateIO.address.valid := memoryctrlIO.readScratchpadReady
 
-    aligner.io.equal := true.B //TODO: what does this signal do?
+    aligner.io.equal := copyEmitter.io.equal // whether the stream is still equal or not
+	aligner.io.hit := realMatchFound
 
     /*
     * Match finder
     */
     // scans the scratchpad for matches
-    val matchFinder = Module(new MatchFinder(params.scratchpadWidth, 32, params.hashTableSize))
-    // instantiate the module that does the copy length check
-    val copyEmitter = Module(new CopyCompress(new CopyCompressParams {
-        val parallellane = 4
-    }))
-
     // pass in the global src pointer
     matchFinder.io.src := src
     // pass in the global matchB pointer
@@ -165,13 +167,13 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     * Copy emitter
     */
     // send the comparison data into the copyEmitter
-    (copyEmitter.io.candidate zip aligner.io.readCandidateIO.data.bits.asTypeOf(Vec(4, UInt(8.W)))).foreach { case (cand, aio) => cand.bits := aio }
-    (copyEmitter.io.data zip aligner.io.readDataIO.data.bits.asTypeOf(Vec(4, UInt(8.W)))).foreach { case (data, aio) => data.bits := aio }
+    (copyEmitter.io.candidate zip aligner.io.readCandidateIO.data.bits.asTypeOf(Vec(4, UInt(8.W))).reverse).foreach { case (cand, aio) => cand.bits := aio }
+    (copyEmitter.io.data zip aligner.io.readDataIO.data.bits.asTypeOf(Vec(4, UInt(8.W))).reverse).foreach { case (data, aio) => data.bits := aio }
     when(memoryctrlIO.readScratchpadReady && aligner.io.readDataIO.data.valid) {
         (copyEmitter.io.candidate zip copyEmitter.io.data).zipWithIndex.foreach({
             case ((a, b), i) =>
-                a.valid := Mux(i.U < remain || remain >= 4.U, true.B, false.B)
-                b.valid := Mux(i.U < remain || remain >= 4.U, true.B, false.B)
+                a.valid := Mux(i.U < remain || remain >= 4.U, aligner.io.readCandidateIO.data.valid, false.B)
+                b.valid := Mux(i.U < remain || remain >= 4.U, aligner.io.readDataIO.data.valid, false.B)
         })
     }.otherwise {
         (copyEmitter.io.candidate zip copyEmitter.io.data).foreach({
