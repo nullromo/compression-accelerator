@@ -40,8 +40,6 @@ class ExampleTopModule[+L <: ExampleTop](l: L) extends ExampleRocketSystemModule
     with HasPeripherySerialModuleImp
     with DontTouch
 
-case object BuildTop extends Field[(Clock, Bool, Parameters) => ExampleTopModule[ExampleTop]]
-
 class WithExampleTop extends Config((site, here, up) => {
   case BuildTop => (clock: Clock, reset: Bool, p: Parameters) => {
     Module(LazyModule(new ExampleTop()(p)).module)

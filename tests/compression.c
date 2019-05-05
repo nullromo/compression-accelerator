@@ -46,12 +46,14 @@ int main(void)
     char recovered[256]; //(char*) calloc(256, sizeof(char));
 
     printf("Compressing [%d bytes] \"%s\" ...\n", original_length, original);
-    int compressed_length = compress(original, original_length, compressed);
+    int compressed_length;
+    compressed_length = compress(original, original_length, compressed);
 
     printf("... got [%d bytes] \"%s\" ...\n", compressed_length, compressed);
 
+    int success;
     printf("Uncompressing... \n");
-    int success = uncompress(compressed, compressed_length, recovered);
+    success = uncompress(compressed, compressed_length, recovered);
 
     printf("Recovered \"%s\" result: %d.\n", recovered, success);
 

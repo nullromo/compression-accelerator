@@ -61,7 +61,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
         // store head/tail ptrs
         val headSWp = RegInit(0.U(log2Ceil(nRows).W))
         val tailSWp = RegInit(1.U(log2Ceil(nRows).W))
-        val fullSW = Wire(Bool())
+        val fullSW = WireInit(false.B)
         val emptySW = RegInit(true.B)
 
         // load/store address tracker
