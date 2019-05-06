@@ -16,7 +16,7 @@ class DataGenerator extends FlatSpec with Matchers {
         val rand = new Random(4444)
 
         // lengths of files to generate
-        val lengths: Seq[Int] = Seq(10, 20, 50, 100, 200, 500, 1000, 2000)
+        val lengths: Seq[Int] = Seq(10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000)
 
         // output directory
         val outputDir = "benchmark-data/"
@@ -43,7 +43,7 @@ class DataGenerator extends FlatSpec with Matchers {
                 // write the data
                 for (i <- 0 until length) {
                     randomWriter.write(rand.nextInt(256))
-                    realWriter.write(foxInSocks(i))
+                    realWriter.write(foxInSocks(i % foxInSocks.length))
                     repeatingWriter.write("a")
                 }
 
