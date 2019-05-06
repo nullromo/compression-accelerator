@@ -49,7 +49,7 @@ class GenerateMemdata extends FlatSpec with Matchers {
         val memory_data = Array.fill[Seq[Int]](8)(Array.fill[Int]((pow(2, 8) - 1).toInt)(randgen.nextInt(256)))
 
         for (i <- 0 until 8) {
-            val fileName = "memdata/memdata.hex_" + i + ".txt"
+            val fileName = "data/memdata.hex_" + i + ".txt"
             val writer = new PrintWriter(new File(fileName))
             for (k <- memory_data(i).indices) {
                 writer.write(memory_data(i)(k).toHexString)
@@ -62,7 +62,8 @@ class GenerateMemdata extends FlatSpec with Matchers {
             //loadMemFromFile(fileName, mem)
         }
 
-        val fileNameall = "memdata/memdata.hex.txt"
+        val fileNameall = "" +
+            "data/memdata.hex.txt"
         val writerall = new PrintWriter(new File(fileNameall))
         for (i <- memory_data(0).indices) {
             var storeData: String = ""
@@ -81,7 +82,7 @@ class GenerateMemdata extends FlatSpec with Matchers {
         //loadMemFromFile(fileName, mem)
         //val mem_array = Array.ofDim[String](8)
         /*mem_array.zipWithIndex.foreach{case(mem, k) => mem_array(k) = "ram.mem_" + k
-                                                       val fileName = "memdata/memdata_"+k+".txt"
+                                                       val fileName = "data/memdata_"+k+".txt"
                                                        loadMemFromFile(fileName, mem_array(k))}*/
 
     }

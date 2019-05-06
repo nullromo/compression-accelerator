@@ -16,7 +16,3 @@ results/*
 test_run_dir/
 verisim/DVEfiles/
 verisim/opendatabase.log
-memdata/*
-!memdata/.gitkeep
-benchmark-data/*
-!benchmark-data/.gitkeep
