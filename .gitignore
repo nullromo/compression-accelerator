@@ -10,6 +10,7 @@ target
 simv*
 *.vcd
 .DS_Store
+
 results/*
 !results/.gitkeep
 .idea/
