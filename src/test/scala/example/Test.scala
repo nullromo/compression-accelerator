@@ -49,7 +49,7 @@ class GenerateMemdata extends FlatSpec with Matchers {
         val memory_data = Array.fill[Seq[Int]](8)(Array.fill[Int]((pow(2, 8) - 1).toInt)(randgen.nextInt(256)))
 
         for (i <- 0 until 8) {
-            val fileName = "memdata/memdata.hex_" + i + ".txt"
+            val fileName = "data/memdata.hex_" + i + ".txt"
             val writer = new PrintWriter(new File(fileName))
             for (k <- memory_data(i).indices) {
                 writer.write(memory_data(i)(k).toHexString)
@@ -62,7 +62,8 @@ class GenerateMemdata extends FlatSpec with Matchers {
             //loadMemFromFile(fileName, mem)
         }
 
-        val fileNameall = "memdata/memdata.hex.txt"
+        val fileNameall = "" +
+            "data/memdata.hex.txt"
         val writerall = new PrintWriter(new File(fileNameall))
         for (i <- memory_data(0).indices) {
             var storeData: String = ""
@@ -81,7 +82,7 @@ class GenerateMemdata extends FlatSpec with Matchers {
         //loadMemFromFile(fileName, mem)
         //val mem_array = Array.ofDim[String](8)
         /*mem_array.zipWithIndex.foreach{case(mem, k) => mem_array(k) = "ram.mem_" + k
-                                                       val fileName = "memdata/memdata_"+k+".txt"
+                                                       val fileName = "data/memdata_"+k+".txt"
                                                        loadMemFromFile(fileName, mem_array(k))}*/
 
     }
@@ -102,6 +103,7 @@ class TreadleTest extends FlatSpec with Matchers {
             val fileName = "data/alignerTestData_" + k + ".txt"
             loadMemFromFile(fileName, mem_array(k))
         }
+        tester.step(200)
 
         // start compression
         //set length: 100
@@ -117,18 +119,33 @@ class TreadleTest extends FlatSpec with Matchers {
         //stop sending commands
         tester.poke("io_cmd_valid", 0)
 
-        //do testing
+        //run for many cycles
         var dump: List[BigInt] = List()
+        for (i <- 0 until 1600) {
 
-        for (i <- 0 until 2000) {
+            //advance
             tester.step()
+
+            //test TLTestRAM memory for changes
             val newDump = readMem(mem_array, 200, 8)
-            if(i % 200 == 0 && i != 0)
+            if (i % 200 == 0 && i != 0)
                 println("Cycle " + i)
             if (dump != newDump) {
                 dump = newDump
                 println("Cycle " + i)
                 dumpMem(dump)
+            }
+
+            //check dma req valid
+            val spaddr = tester.peek("accelerator.memoryctrl.io_dma_req_bits_spaddr")
+            val spbank = tester.peek("accelerator.memoryctrl.io_dma_req_bits_spbank")
+            val vaddr = tester.peek("accelerator.memoryctrl.io_dma_req_bits_vaddr")
+            val write = tester.peek("accelerator.memoryctrl.io_dma_req_bits_write")
+
+            println("matchB: " + tester.peek("accelerator.matchB"))
+
+            if (write != 0) {
+                println("dma write. cycle " + i + " (" + write + ")")
             }
         }
         println()

@@ -33,6 +33,10 @@ class CompressionAccelerator(opcodes: OpcodeSet, params: CompressionParameters =
 class CompressionAcceleratorModule(outer: CompressionAccelerator, params: CompressionParameters)(implicit p: Parameters)
     extends LazyRoCCModuleImp(outer) with HasCoreParameters {
 
+    val TOTAL_CYCLES: UInt = RegInit(0.U(32.W))
+    dontTouch(TOTAL_CYCLES)
+    TOTAL_CYCLES := TOTAL_CYCLES + 1.U
+
     // get a reference to the scratchpad inside the implementation module
     import outer.{memoryctrl, scratchpad}
 
@@ -65,7 +69,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     // drives the busy signal to tell the CPU that the accelerator is busy
     val busy = RegInit(false.B)
     cmd.ready := !busy
-    io.busy := busy
+    io.busy := false.B
 
     // constants for compression
     val kInputMarginBytes: UInt = 15.U
@@ -356,7 +360,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 
     //TODO: figure out how to use these properly
     io.mem.req.valid := false.B
-    io.resp.valid := false.B
+    io.resp.valid := true.B
     io.resp.bits.rd := RegNext(io.resp.bits.rd)
     io.resp.bits.data := (-1).S(xLen.W).asUInt()
     io.interrupt := false.B
