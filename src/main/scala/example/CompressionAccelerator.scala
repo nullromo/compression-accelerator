@@ -82,6 +82,8 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     val prev_startReady = RegInit(true.B)
     // true when an emit was forced on the previous cycle
     val prev_forceEmit = RegInit(false.B)
+	// first write of literal emitter
+	val firstWrite = RegInit(false.B)
 
     // keeps track of how many things are being copied to the write bank
     val streamCounter = RegInit(0.U(4.W))
@@ -220,6 +222,12 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     val bytesInCopyTag: UInt = Wire(UInt(3.W))
     bytesInCopyTag := VecInit(0.U, 2.U, 3.U, 5.U)(copyEmitter.io.copyCompressed.bits.tag)
 
+	when((!matchFinder.io.start.ready && prev_startReady) || (!forceEmit && prev_forceEmit)){
+		when(!aligner.io.readDataIO.data.valid){
+			firstWrite := true.B
+		}
+	}
+
     // Increase stream counter
     when(!memoryctrlIO.fullSW) {
         when(!matchFinder.io.start.ready) {
@@ -227,12 +235,20 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
                 when(aligner.io.readDataIO.data.valid) {
                     streamCounter := (streamCounter % 8.U) + 2.U
                     streamHolder((streamCounter % 8.U) + 1.U) := aligner.io.readDataIO.data.bits(7, 0)
-                }.otherwise {
+                }/*.otherwise {
                     streamCounter := (streamCounter % 8.U) + 1.U
-                }
+                }*/
             }.otherwise {
-                streamCounter := (streamCounter % 8.U) + 1.U
-                streamHolder(streamCounter % 8.U) := aligner.io.readDataIO.data.bits(7, 0)
+				when(aligner.io.readDataIO.data.valid){
+					when(firstWrite){
+						firstWrite := false.B
+                    	streamCounter := (streamCounter % 8.U) + 2.U
+                    	streamHolder((streamCounter % 8.U) + 1.U) := aligner.io.readDataIO.data.bits(7, 0)
+					}.otherwise{
+                		streamCounter := (streamCounter % 8.U) + 1.U
+                		streamHolder(streamCounter % 8.U) := aligner.io.readDataIO.data.bits(7, 0)
+					}
+				}
             }
         }.elsewhen(copyEmitter.io.copyCompressed.fire()) {
             streamCounter := (streamCounter % 8.U) + bytesInCopyTag
@@ -276,7 +292,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
             }
             when(realMatchFound) {
                 matchA := matchFinder.io.matchA.bits + 4.U
-                offset := matchB - matchA // offset logic
+                offset := matchB - matchFinder.io.matchA.bits // offset logic
             }
         }.otherwise {
             when(copyEmitter.io.bufferPtrInc.valid && !memoryctrlIO.outOfRangeFlag) {
@@ -313,13 +329,14 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
             nextEmitValid := true.B
             matchA := cmd.bits.rs1
             matchB := cmd.bits.rs1
-            matchFinder.io.start.valid := true.B
+            matchFinder.io.start.valid := false.B
             busy := true.B
             src := cmd.bits.rs1
             dst := cmd.bits.rs2
             streamCounter := 0.U
             streamHolder.foreach(_ := 0.U)
             streamEmpty := true.B
+			firstWrite := false.B
             prev_startReady := true.B
             prev_forceEmit := false.B
         }.elsewhen(doUncompress) {
