@@ -86,6 +86,9 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     val prev_startReady = RegInit(true.B)
     // true when an emit was forced on the previous cycle
     val prev_forceEmit = RegInit(false.B)
+	// generate endEncode palse
+	val trueEndEncode = WireInit(false.B)
+	val trueEndEncode_prev = RegInit(false.B)
 	// first write of literal emitter
 	val firstWrite = RegInit(false.B)
 
@@ -208,15 +211,19 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 	memoryctrlIO.remain := remain
     memoryctrlIO.equal := copyEmitter.io.equal
     // -- encode end when : in literal mode, remain is 0; in copy mode, copy is not busy anymore
-    memoryctrlIO.endEncode := (remain === 0.U) && (!copyEmitter.io.copyBusy)
-    memoryctrlIO.storeData.valid := !memoryctrlIO.fullSW && (streamCounter > 7.U) /// needs to check !!!!!!!!!!!!
+    memoryctrlIO.endEncode := trueEndEncode_prev
+    memoryctrlIO.storeData.valid := (!memoryctrlIO.fullSW && (streamCounter > 7.U) && memoryctrlIO.storeData.ready && !trueEndEncode) || (!trueEndEncode_prev && trueEndEncode) /// needs to check !!!!!!!!!!!!
 	scratchpadIO.dma <> memoryctrlIO.dma
+	when((remain === 0.U) && (!copyEmitter.io.copyBusy) && (streamCounter < 8.U) && busy){
+		trueEndEncode := true.B
+	}
+	trueEndEncode_prev := trueEndEncode
 
     // when stream is true, bytes read from the read bank will be sent into the write bank
     val stream = RegInit(true.B)
 
     // stream searched bytes through to the write bank
-    scratchpadIO.write(1).en := ((streamCounter > 7.U) || forceEmit || matchFinder.io.matchA.valid) && !memoryctrlIO.fullSW
+    scratchpadIO.write(1).en := (((streamCounter > 7.U) || forceEmit || matchFinder.io.matchA.valid) && !memoryctrlIO.fullSW && memoryctrlIO.storeData.ready && !trueEndEncode) || (!trueEndEncode_prev && trueEndEncode)
     scratchpadIO.write(1).data := Mux(forceEmit || matchFinder.io.matchA.valid, ((matchB - nextEmit) << (2.U + emptySpotCounter * 8.U)).asTypeOf(UInt(64.W)), streamHolder.asTypeOf(UInt(128.W))(63, 0))
     scratchpadIO.write(1).addr := Mux(forceEmit || matchFinder.io.matchA.valid, emptySpotAddr, Mux(memoryctrlIO.emptySW, memoryctrlIO.storeSpAddr - 1.U, memoryctrlIO.storeSpAddr))
     scratchpadIO.write(1).mask := Mux(forceEmit || matchFinder.io.matchA.valid, (1.U << emptySpotCounter).asTypeOf(Vec(8, Bool())), 255.U.asTypeOf(Vec(8, Bool())))
@@ -287,7 +294,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     prev_startReady := matchFinder.io.start.ready
     prev_forceEmit := forceEmit
 
-    when(memoryctrlIO.readScratchpadReady) {
+    when(memoryctrlIO.readScratchpadReady && remain > 0.U) {
         when(!copyEmitter.io.copyBusy && aligner.io.readDataIO.address.ready) {
             when(matchFinder.io.newData.ready && !memoryctrlIO.outOfRangeFlag) {
                 when(!realMatchFound) {
@@ -314,7 +321,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     // ****** next emit logic ******
     // -- nextEmit should be the matchB position when system just finish copy emitter
     // -- nextEmit valid when the literal emitter finish current match found and store them back into write bank
-    when((!copyEmitter.io.copyBusy && prev_copyBusy) || forceEmit) {
+    when(((!copyEmitter.io.copyBusy && prev_copyBusy) || forceEmit)) {
         nextEmit := matchB
         nextEmitValid := true.B
         emptySpotAddr := memoryctrlIO.storeSpAddr + (streamCounter / 8.U)
@@ -324,6 +331,10 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     when(matchFinder.io.matchA.fire() && nextEmitValid) {
         nextEmitValid := false.B
     }
+
+	when(trueEndEncode){
+		nextEmitValid := false.B
+	}
 
 
     // initialize each operation
@@ -343,6 +354,8 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
             streamHolder.foreach(_ := 0.U)
             streamEmpty := true.B
 			firstWrite := false.B
+			trueEndEncode := false.B
+			trueEndEncode_prev := false.B
             prev_startReady := true.B
             prev_forceEmit := false.B
         }.elsewhen(doUncompress) {
