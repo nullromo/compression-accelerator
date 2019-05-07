@@ -217,8 +217,8 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 
     // stream searched bytes through to the write bank
     scratchpadIO.write(1).en := ((streamCounter > 7.U) || forceEmit || matchFinder.io.matchA.valid) && !memoryctrlIO.fullSW
-    scratchpadIO.write(1).data := Mux(forceEmit || matchFinder.io.matchA.valid, ((matchB - nextEmit) << 2.U).asTypeOf(UInt(64.W)), streamHolder.asTypeOf(UInt(128.W))(63, 0))
-    scratchpadIO.write(1).addr := Mux(forceEmit || matchFinder.io.matchA.valid, emptySpotAddr, memoryctrlIO.storeSpAddr)
+    scratchpadIO.write(1).data := Mux(forceEmit || matchFinder.io.matchA.valid, ((matchB - nextEmit) << (2.U + emptySpotCounter * 8.U)).asTypeOf(UInt(64.W)), streamHolder.asTypeOf(UInt(128.W))(63, 0))
+    scratchpadIO.write(1).addr := Mux(forceEmit || matchFinder.io.matchA.valid, emptySpotAddr, Mux(memoryctrlIO.emptySW, memoryctrlIO.storeSpAddr - 1.U, memoryctrlIO.storeSpAddr))
     scratchpadIO.write(1).mask := Mux(forceEmit || matchFinder.io.matchA.valid, (1.U << emptySpotCounter).asTypeOf(Vec(8, Bool())), 255.U.asTypeOf(Vec(8, Bool())))
 
     // how many bytes are outputted as the copy based on the tag type
@@ -234,11 +234,17 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 
     // Increase stream counter
     when(!memoryctrlIO.fullSW) {
-        when(!matchFinder.io.start.ready) {
+        // shift stream holder when a cache line is full
+        when(streamCounter > 7.U) {
+            (streamHolder.slice(0, 8) zip streamHolder.slice(8, 16)).foreach { case (a, b) => a := b }
+            streamHolder.slice(8, 16).foreach(a => a := 0.U)
+        }
+
+		when(!matchFinder.io.start.ready && !realMatchFound) {
             when(prev_startReady || (!forceEmit && prev_forceEmit)) {
                 when(aligner.io.readDataIO.data.valid) {
                     streamCounter := (streamCounter % 8.U) + 2.U
-                    streamHolder((streamCounter % 8.U) + 1.U) := aligner.io.readDataIO.data.bits(7, 0)
+                    streamHolder((streamCounter % 8.U) + 1.U) := aligner.io.readDataIO.data.bits(31, 24)
                 }/*.otherwise {
                     streamCounter := (streamCounter % 8.U) + 1.U
                 }*/
@@ -247,10 +253,10 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 					when(firstWrite){
 						firstWrite := false.B
                     	streamCounter := (streamCounter % 8.U) + 2.U
-                    	streamHolder((streamCounter % 8.U) + 1.U) := aligner.io.readDataIO.data.bits(7, 0)
+                    	streamHolder((streamCounter % 8.U) + 1.U) := aligner.io.readDataIO.data.bits(31, 24)
 					}.otherwise{
                 		streamCounter := (streamCounter % 8.U) + 1.U
-                		streamHolder(streamCounter % 8.U) := aligner.io.readDataIO.data.bits(7, 0)
+                		streamHolder(streamCounter % 8.U) := aligner.io.readDataIO.data.bits(31, 24)
 					}
 				}
             }
@@ -258,16 +264,12 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
             streamCounter := (streamCounter % 8.U) + bytesInCopyTag
             for (i <- 0 until 5) {
                 when(i.U < bytesInCopyTag) {
-                    streamHolder((streamCounter % 8.U) + i.U) := copyEmitter.io.copyCompressed.bits.copy((i * 8) + 7, i * 8)
+                    streamHolder((streamCounter % 8.U) + i.U) := copyEmitter.io.copyCompressed.bits.copy.asTypeOf(Vec(5, UInt(8.W)))(bytesInCopyTag-1.U-i.U)
                 }
             }
         }
 
-        // shift stream holder when a cache line is full
-        when(streamCounter > 7.U) {
-            (streamHolder.slice(0, 8) zip streamHolder.slice(8, 16)).foreach { case (a, b) => a := b }
-            streamHolder.slice(8, 16).foreach(a => a := 0.U)
-        }
+
     }
 
 

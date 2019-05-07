@@ -38,6 +38,7 @@ class MemoryControllerIO(val nRows: Int, val dataBytes: Int)(implicit p: Paramet
     val forceLiteral = Output(Bool())                       // scratchpad is full and no match found
     val outOfRangeFlag = Output(Bool())                     // whether the current dataPtr is out of scratch pad range or not
     val fullSW = Output(Bool())                             // whether the store bank is full or not
+	val emptySW = Output(Bool())							// whether the store bank is empty
 
     // -- DMA arbiter port to Scratchpad
     val dma = new ScratchpadMemIO(2, nRows)                 // 2 banks: 0 -> load bank   1 -> store bank
@@ -94,12 +95,16 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
         fullSW := (headSWp === tailSWp)
 
         io.fullSW := fullSW
+		io.emptySW := emptySW
 
         // store compressed data into scratchpad
         // -- because each dma store needs to store all data in store scratchpad, tail should not move during write tp L2$
         when(io.storeData.fire()){
-            tailSWp := tailSWp + 1.U
-			emptySW := false.B
+			when(!emptySW){
+            	tailSWp := tailSWp + 1.U
+			}.otherwise{
+				emptySW := false.B
+			}
         }
         io.storeData.ready := !(fullSW || (stateDMA === s_dma_write))
 
