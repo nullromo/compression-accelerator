@@ -34,7 +34,7 @@ class CompressionAcceleratorTester(c: ScratchpadTestModule, filename: String) ex
     // compress
     poke(c.io.cmd.bits.inst.funct, 0) // doCompress
     poke(c.io.cmd.bits.rs1, 0x000) // src = 0
-    poke(c.io.cmd.bits.rs2, length * 8) // dst = length divisible by 8
+    poke(c.io.cmd.bits.rs2, (Math.ceil(length / 8.0) * 8.0).toInt + 8) // dst = length divisible by 8
     step(1)
 
     // stop sending commands
