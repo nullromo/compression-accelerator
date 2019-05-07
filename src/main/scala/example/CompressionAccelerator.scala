@@ -78,6 +78,8 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 
     // valid match found (matchA is in valid scratchpad look-back range)
     val realMatchFound: Bool = Wire(Bool())
+	// valid match found prev
+	val realMatchFound_prev: Bool = RegInit(false.B)
     // keep track of how many bytes there are left to compress
     val remain: UInt = Wire(UInt(64.W))
     // true when the copy path was working on the previous cycle
@@ -101,6 +103,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     val forceEmit: Bool = Wire(Bool())
     // for the empty literal length slot, this is the offset within the stream buffer
     val emptySpotCounter = RegInit(0.U(3.W))
+	val emptySpotCounter_prev = RegInit(0.U(3.W)) // in case both streamer and hit trying to write scratchpad at the same time
     // holds the actual address of the empty slot so that it can be filled in later
     val emptySpotAddr = RegInit(0.U(log2Ceil(params.scratchpadEntries).W))
 
@@ -212,7 +215,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     memoryctrlIO.equal := copyEmitter.io.equal
     // -- encode end when : in literal mode, remain is 0; in copy mode, copy is not busy anymore
     memoryctrlIO.endEncode := trueEndEncode_prev
-    memoryctrlIO.storeData.valid := (!memoryctrlIO.fullSW && (streamCounter > 7.U) && memoryctrlIO.storeData.ready && !trueEndEncode) || (!trueEndEncode_prev && trueEndEncode) /// needs to check !!!!!!!!!!!!
+    memoryctrlIO.storeData.valid := (!memoryctrlIO.fullSW && (streamCounter > 7.U && !realMatchFound) && memoryctrlIO.storeData.ready && !trueEndEncode) || (!trueEndEncode_prev && trueEndEncode) /// needs to check !!!!!!!!!!!!
 	scratchpadIO.dma <> memoryctrlIO.dma
 	when((remain === 0.U) && (!copyEmitter.io.copyBusy) && (streamCounter < 8.U) && busy){
 		trueEndEncode := true.B
@@ -226,7 +229,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     scratchpadIO.write(1).en := (((streamCounter > 7.U) || forceEmit || matchFinder.io.matchA.valid) && !memoryctrlIO.fullSW && memoryctrlIO.storeData.ready && !trueEndEncode) || (!trueEndEncode_prev && trueEndEncode)
     scratchpadIO.write(1).data := Mux(forceEmit || matchFinder.io.matchA.valid, ((matchB - nextEmit) << (2.U + emptySpotCounter * 8.U)).asTypeOf(UInt(64.W)), streamHolder.asTypeOf(UInt(128.W))(63, 0))
     scratchpadIO.write(1).addr := Mux(forceEmit || matchFinder.io.matchA.valid, emptySpotAddr, Mux(memoryctrlIO.emptySW, memoryctrlIO.storeSpAddr - 1.U, memoryctrlIO.storeSpAddr))
-    scratchpadIO.write(1).mask := Mux(forceEmit || matchFinder.io.matchA.valid, (1.U << emptySpotCounter).asTypeOf(Vec(8, Bool())), 255.U.asTypeOf(Vec(8, Bool())))
+    scratchpadIO.write(1).mask := Mux(forceEmit || matchFinder.io.matchA.valid, (1.U << emptySpotCounter).asTypeOf(Vec(8, Bool())), Mux((streamCounter > 7.U) && realMatchFound_prev, (~(1.U << emptySpotCounter)).asTypeOf(Vec(8,Bool())),255.U.asTypeOf(Vec(8, Bool()))))
 
     // how many bytes are outputted as the copy based on the tag type
     // 00 => 0 bytes; 01 => 2 bytes; 10 => 3 bytes; 11 => 5 bytes
@@ -242,9 +245,10 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     // Increase stream counter
     when(!memoryctrlIO.fullSW) {
         // shift stream holder when a cache line is full
-        when(streamCounter > 7.U) {
+        when(streamCounter > 7.U && !realMatchFound) {
             (streamHolder.slice(0, 8) zip streamHolder.slice(8, 16)).foreach { case (a, b) => a := b }
             streamHolder.slice(8, 16).foreach(a => a := 0.U)
+			streamCounter := streamCounter % 8.U
         }
 
 		when(!matchFinder.io.start.ready && !realMatchFound) {
@@ -290,7 +294,8 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     // -- when finding copy, matchA should be increased the same way as dataPtr
 
     realMatchFound := matchFinder.io.matchA.valid && !(memoryctrlIO.outOfRangeFlag && matchFinder.io.matchA.bits < memoryctrlIO.minvAddr + 8.U)
-    prev_copyBusy := copyEmitter.io.copyBusy
+    realMatchFound_prev := realMatchFound
+	prev_copyBusy := copyEmitter.io.copyBusy
     prev_startReady := matchFinder.io.start.ready
     prev_forceEmit := forceEmit
 
@@ -321,6 +326,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     // ****** next emit logic ******
     // -- nextEmit should be the matchB position when system just finish copy emitter
     // -- nextEmit valid when the literal emitter finish current match found and store them back into write bank
+	// -- emptySpotCounter_prev is used to deal with both streamholder and literal emitter trying to write back tp scratchpad at the same time.
     when(((!copyEmitter.io.copyBusy && prev_copyBusy) || forceEmit)) {
         nextEmit := matchB
         nextEmitValid := true.B
@@ -328,12 +334,18 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
         emptySpotCounter := streamCounter % 8.U
     }
 
+	emptySpotCounter_prev := emptySpotCounter
+
     when(matchFinder.io.matchA.fire() && nextEmitValid) {
         nextEmitValid := false.B
     }
 
 	when(trueEndEncode){
 		nextEmitValid := false.B
+	}
+
+	when(busy && trueEndEncode && memoryctrlIO.emptySW){
+		busy := false.B
 	}
 
 
@@ -353,11 +365,14 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
             streamCounter := 0.U
             streamHolder.foreach(_ := 0.U)
             streamEmpty := true.B
+			emptySpotCounter := 0.U
+			emptySpotCounter_prev := 0.U
 			firstWrite := false.B
 			trueEndEncode := false.B
 			trueEndEncode_prev := false.B
             prev_startReady := true.B
             prev_forceEmit := false.B
+			realMatchFound_prev := false.B
         }.elsewhen(doUncompress) {
             busy := true.B
             // ...
