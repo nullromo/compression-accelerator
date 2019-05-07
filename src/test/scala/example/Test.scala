@@ -65,7 +65,7 @@ class CompressionAcceleratorSpec extends ChiselFlatSpec {
     for (filename <- filenames.map(_.toString)) {
         val dutGen: () => ScratchpadTestModule = () => LazyModule(new ScratchpadTest(OpcodeSet.custom3, filename)).module
         "CompressionAccelerator" should ("run compresison for " + filename) in {
-            Driver.execute(TesterArgs() :+ ("CompressionAccelerator" + filenames(0).getName), dutGen) {
+            Driver.execute(TesterArgs() :+ "CompressionAccelerator", dutGen) {
                 c => new CompressionAcceleratorTester(c, filename)
             } should be(true)
         }
