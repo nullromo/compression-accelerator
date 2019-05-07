@@ -68,6 +68,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 
     // drives the busy signal to tell the CPU that the accelerator is busy
     val busy = RegInit(false.B)
+    val prevBusy = RegNext(busy)
     cmd.ready := !busy
     io.busy := false.B
 
@@ -283,6 +284,11 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 
     }
 
+    val finalSWPointerOffset = RegInit(0.U(3.W))
+    when(remain === 0.U && memoryctrlIO.storeData.valid && !trueEndEncode) {
+        finalSWPointerOffset := streamCounter
+    }
+
 
     // ****** Change of matchB (which is dataPtr) ******
     // -- when the system is finding match, add skip byte number when match finder is ready to receive data and dataPtr is within range
@@ -386,12 +392,17 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     dontTouch(streamHolder)
     dontTouch(streamEmpty)
 
+    // clear the valid bits of the hash table when a new compression job starts
     matchFinder.io.clear := cmd.fire()
 
-    //TODO: figure out how to use these properly
+    // don't use the L1
     io.mem.req.valid := false.B
-    io.resp.valid := true.B
-    io.resp.bits.rd := RegNext(io.resp.bits.rd)
-    io.resp.bits.data := (-1).S(xLen.W).asUInt()
+
+    // send response into rd
+    io.resp.valid := prevBusy && !busy
+    io.resp.bits.rd := cmd.bits.inst.rd
+    io.resp.bits.data := ((memoryctrlIO.storeSpAddr - 1.U) * 8.U) + finalSWPointerOffset
+
+    // TODO: use this
     io.interrupt := false.B
 }
