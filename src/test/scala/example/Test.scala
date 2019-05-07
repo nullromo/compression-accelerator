@@ -14,32 +14,61 @@ import java.io.File
 import java.io.PrintWriter
 
 
-class CompressionAcceleratorTester(c: ScratchpadTestModule) extends PeekPokeTester(c) {
+class CompressionAcceleratorTester(c: ScratchpadTestModule, filename: String) extends PeekPokeTester(c) {
+
+    // timeout
+    var timeout = 0
+
+    //get length from filename
+    val length = filename.split("-").last.split(".txt")(0).toInt
+    val dataset = filename.split("/").last.split(".txt")(0).split("-")(0)
+    println("== type is " + dataset)
+    println("== length is " + length)
 
     // set length
     poke(c.io.cmd.bits.inst.funct, 2) // doSetLength
-    poke(c.io.cmd.bits.rs1, 101) // length = 100
+    poke(c.io.cmd.bits.rs1, length + 1) // length = length + 1
     poke(c.io.cmd.valid, true) // fire
     step(1)
+
     // compress
     poke(c.io.cmd.bits.inst.funct, 0) // doCompress
     poke(c.io.cmd.bits.rs1, 0x000) // src = 0
-    poke(c.io.cmd.bits.rs2, 0x068) // dst = 104
+    poke(c.io.cmd.bits.rs2, length * 8) // dst = length divisible by 8
     step(1)
-    poke(c.io.cmd.valid, false)
-    step(1000)
-    //  expect(peek(c.io.interrupt) != 277, "I should have passed ;(")
 
+    // stop sending commands
+    poke(c.io.cmd.valid, false)
+
+    // run until the output is valid
+    while(peek(c.io.resp.valid) == 0 && timeout < 100 * length) {
+        step(1)
+        timeout += 1
+    }
+
+    // run a bit longer
+    step(10)
+
+    // print results
+    println("== compressed length: " + peek(c.io.resp.bits.data))
+    println("== cycles: " + peek(c.io.busyCycles))
 }
 
 class CompressionAcceleratorSpec extends ChiselFlatSpec {
     implicit val p: Parameters = AcceleratorParams()
 
-    val dutGen: () => ScratchpadTestModule = () => LazyModule(new ScratchpadTest(OpcodeSet.custom3)).module
-    "CompressionAccelerator" should "accept commands" in {
-        Driver.execute(TesterArgs() :+ "CompressionAccelerator", dutGen) {
-            c => new CompressionAcceleratorTester(c)
-        } should be(true)
+    val dir = new File("benchmark/benchmark-data/")
+//    val filenames: Array[File] = dir.listFiles().filter(!_.getName.contains("_")).filter(!_.getName.contains("gitkeep"))
+
+    val filenames = List(new File("benchmark/benchmark-data/repeating-200.txt"))
+
+    for (filename <- filenames.map(_.toString)) {
+        val dutGen: () => ScratchpadTestModule = () => LazyModule(new ScratchpadTest(OpcodeSet.custom3, filename)).module
+        "CompressionAccelerator" should ("run compresison for " + filename) in {
+            Driver.execute(TesterArgs() :+ ("CompressionAccelerator" + filenames(0).getName), dutGen) {
+                c => new CompressionAcceleratorTester(c, filename)
+            } should be(true)
+        }
     }
 }
 

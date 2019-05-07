@@ -19,7 +19,7 @@ case class CompressionParameters(hashTableSize: Int,
 object DefaultCompressionParameters extends CompressionParameters(
     hashTableSize = 512,
     scratchpadBanks = 2,
-    scratchpadEntries = 128,
+    scratchpadEntries = 6400,
     scratchpadWidth = 64)
 
 class CompressionAccelerator(opcodes: OpcodeSet, params: CompressionParameters = DefaultCompressionParameters)(implicit p: Parameters)
@@ -70,7 +70,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     val busy = RegInit(false.B)
     val prevBusy = RegNext(busy)
     cmd.ready := !busy
-    io.busy := false.B
+    io.busy := busy
 
     // constants for compression
     val kInputMarginBytes: UInt = 15.U

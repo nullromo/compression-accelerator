@@ -19,7 +19,7 @@ class DataGenerator extends FlatSpec with Matchers {
         val lengths: Seq[Int] = Seq(10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000)
 
         // output directory
-        val outputDir = "benchmark-data/"
+        val outputDir = "benchmark/benchmark-data/"
 
         // entire text of Fox in Socks
         val foxInSocksSource = Source.fromFile("data/fox-in-socks.txt")
@@ -32,13 +32,13 @@ class DataGenerator extends FlatSpec with Matchers {
             for (length <- lengths) {
 
                 // make a file of random data
-                val randomWriter = new PrintWriter(new File(outputDir + "random-" + length + ".dat"))
+                val randomWriter = new PrintWriter(new File(outputDir + "random-" + length + ".txt"))
 
                 // make a file from Fox in Socks
-                val realWriter = new PrintWriter(new File(outputDir + "real-" + length + ".dat"))
+                val realWriter = new PrintWriter(new File(outputDir + "real-" + length + ".txt"))
 
                 // make a file of all a's
-                val repeatingWriter = new PrintWriter(new File(outputDir + "repeating-" + length + ".dat"))
+                val repeatingWriter = new PrintWriter(new File(outputDir + "repeating-" + length + ".txt"))
 
                 // write the data
                 for (i <- 0 until length) {
@@ -56,5 +56,42 @@ class DataGenerator extends FlatSpec with Matchers {
 
         // actually do it
         generateData()
+    }
+
+    "DataGenerator" should "convert files into a chisel-readable format" in {
+        // list of all the filenames to convert
+        val dir = new File("benchmark/benchmark-data/")
+        val filenames = dir.listFiles().filter(!_.getName.contains("_")).filter(!_.getName.contains("gitkeep"))
+
+        /**
+          * Converts a file into the right format
+          */
+        def convertFile(filename: String): Unit = {
+            // read the original file
+            val fileSource = Source.fromFile(filename)
+            val fileText = try fileSource.mkString finally fileSource.close()
+
+            // make a list of print writers
+            var files: List[PrintWriter] = List()
+            for (i <- 0 until 8)
+                files = files :+ new PrintWriter(new File(filename.split(".txt")(0) + "_" + i + ".txt"))
+
+            // copy the data
+            for (i <- 0 until (Math.ceil(fileText.length / 8.0) * 8.0).toInt) {
+                if (i < fileText.length)
+                    files(i % 8).write("%02X".format(fileText(i).toByte) + "\n")
+                else
+                    files(i % 8).write("00")
+            }
+
+            // close the files
+            for (writer <- files)
+                writer.close()
+        }
+
+        // actually do it
+        for (name <- filenames.map(_.toString)) {
+            convertFile(name)
+        }
     }
 }
