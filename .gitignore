@@ -17,3 +17,6 @@ results/*
 test_run_dir/
 verisim/DVEfiles/
 verisim/opendatabase.log
+*.swp
+*.orig
+/rocket-chip

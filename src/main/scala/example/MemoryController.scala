@@ -80,7 +80,7 @@ class MemoryController(val nRows: Int, val w: Int, val dataBits: Int = 64)(impli
         val outOfRange = Wire(Bool())
 
         endLoad := (maxLDvAddr >= (io.readBaseAddr + io.length))
-        outOfRange := (io.matchB === (((tailLDp-1.U) * dataBytes.U) - 1.U)) && (io.remain >= dataBytes.U) // need at least two lines to make aligner working properly and not reaching the end of processing
+        outOfRange := (io.matchB === (((tailLDp-1.U) * dataBytes.U) - 1.U)) && (io.remain > (dataBytes+1).U) // need at least two lines to make aligner working properly and not reaching the end of processing
         io.outOfRangeFlag := outOfRange
 
         // min virtual address
