@@ -1,6 +1,6 @@
 import csv
 
-with open('sw_results.csv') as csvfile:
+with open('hw_results_big_table.csv') as csvfile:
     reader = csv.reader(csvfile, delimiter=';')
     real_dict = dict()
     repeat_dict = dict()

@@ -22,8 +22,7 @@ class CompressionAcceleratorTester(c: ScratchpadTestModule, filename: String) ex
     //get length from filename
     val length: Int = filename.split("-").last.split(".txt")(0).toInt
     val dataset: String = filename.split("/").last.split(".txt")(0).split("-")(0)
-    println("== type is " + dataset)
-    println("== length is " + length)
+    println("== type: " + dataset + "; length: " + length + ";")
     // set length
     poke(c.io.cmd.bits.inst.funct, 2) // doSetLength
     poke(c.io.cmd.bits.rs1, length) // length = length
@@ -51,8 +50,7 @@ class CompressionAcceleratorTester(c: ScratchpadTestModule, filename: String) ex
     step(20)
 
     // print results
-    println("== compressed length: " + peek(c.io.resp.bits.data))
-    println("== cycles: " + peek(c.io.busyCycles))
+    println("== cycles: " + peek(c.io.busyCycles) + "; compressed length: " + peek(c.io.resp.bits.data))
 }
 
 class CompressionAcceleratorSpec extends ChiselFlatSpec {
@@ -65,7 +63,8 @@ class CompressionAcceleratorSpec extends ChiselFlatSpec {
 
     for (filename <- files.map(_.toString)) {
         val length: Int = filename.split("-").last.split(".txt")(0).toInt
-        if (length < 500000000) {
+        val doneFiles = ""
+        if (length < 5000000 && !doneFiles.contains(filename)) {
             val dutGen: () => ScratchpadTestModule = () => LazyModule(new ScratchpadTest(OpcodeSet.custom3, filename)).module
             "CompressionAccelerator" should ("run compresison for " + filename) in {
                 Driver.execute(TesterArgs() :+ "CompressionAccelerator", dutGen) {
