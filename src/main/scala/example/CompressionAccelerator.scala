@@ -284,10 +284,6 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 
     }
 
-    val finalSWPointerOffset = RegInit(0.U(3.W))
-    when(remain === 0.U && memoryctrlIO.storeData.valid && !trueEndEncode) {
-        finalSWPointerOffset := streamCounter
-    }
 
 
     // ****** Change of matchB (which is dataPtr) ******
@@ -397,6 +393,12 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 
     // don't use the L1
     io.mem.req.valid := false.B
+
+    // help determine the final compressed length
+    val finalSWPointerOffset = RegInit(0.U(3.W))
+    when(remain === 0.U && memoryctrlIO.storeData.valid && !trueEndEncode) {
+        finalSWPointerOffset := streamCounter
+    }
 
     // send response into rd
     io.resp.valid := prevBusy && !busy
