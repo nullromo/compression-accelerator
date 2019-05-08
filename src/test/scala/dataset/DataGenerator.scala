@@ -59,9 +59,9 @@ class DataGenerator extends FlatSpec with Matchers {
     }
 
     "DataGenerator" should "convert files into a chisel-readable format" in {
-        // list of all the filenames to convert
+        // list of all the files to convert
         val dir = new File("benchmark/benchmark-data/")
-        val filenames = dir.listFiles().filter(!_.getName.contains("_")).filter(!_.getName.contains("gitkeep"))
+        val files = dir.listFiles().filter(!_.getName.contains("_")).filter(!_.getName.contains("gitkeep"))
 
         /**
           * Converts a file into the right format
@@ -90,7 +90,7 @@ class DataGenerator extends FlatSpec with Matchers {
         }
 
         // actually do it
-        for (name <- filenames.map(_.toString)) {
+        for (name <- files.map(_.toString)) {
             convertFile(name)
         }
     }
