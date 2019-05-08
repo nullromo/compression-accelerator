@@ -169,7 +169,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     // tell the matchFinder to start looking: when scratchpad is ready to read and copy emitter is just not busy
     matchFinder.io.start.valid := memoryctrlIO.readScratchpadReady && (!copyEmitter.io.copyBusy || (copyEmitter.io.copyBusy && copyEmitter.io.copyCompressed.valid))
     matchFinder.io.start.bits := DontCare
-    forceEmit := ((matchB - nextEmit) > 59.U)
+    forceEmit := ((matchB - nextEmit) > 59.U) && !matchFinder.io.start.ready && !trueEndEncode && nextEmitValid
     matchFinder.io.matchA.ready := true.B
 
     /*
@@ -284,8 +284,11 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
 
     }
 
+	val remain_prev = RegNext(remain)
     val finalSWPointerOffset = RegInit(0.U(3.W))
-    when(remain === 0.U && memoryctrlIO.storeData.valid && !trueEndEncode) {
+	val storeOffset = RegInit(false.B)
+	storeOffset := (remain === 0.U && remain_prev =/= 0.U && !matchFinder.io.start.ready) || (remain === 0.U && copyEmitter.io.copyCompressed.valid)
+    when(storeOffset) {
         finalSWPointerOffset := streamCounter
     }
 

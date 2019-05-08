@@ -27,7 +27,7 @@ class CompressionAcceleratorTester(c: ScratchpadTestModule, filename: String) ex
 
     // set length
     poke(c.io.cmd.bits.inst.funct, 2) // doSetLength
-    poke(c.io.cmd.bits.rs1, length + 1) // length = length + 1
+    poke(c.io.cmd.bits.rs1, length) // length = length + 1
     poke(c.io.cmd.valid, true) // fire
     step(1)
 

@@ -129,7 +129,7 @@ class CopyCompress(val params: CopyCompressParams) extends Module {
         when(num_candidate_valid >= num_data_valid && !reachEnd) {
             for (i <- 0 until params.parallellane) {
                 when((compareResult.asUInt & (pow(2, i + 1) - 1).toInt.U) === (pow(2, i + 1) - 1).toInt.U) {
-                    when(lengthAccum < maxLength.U && ((lengthAccum + i.U) <= maxLength.U)) { // 6-bits represents 1-64 same bytes not 0-63
+                    when(lengthAccum < maxLength.U && ((lengthAccum + i.U) < maxLength.U-1.U)) { // 6-bits represents 1-64 same bytes not 0-63
                         io.bufferPtrInc.bits := (i + 1).U
                     }
                 }
