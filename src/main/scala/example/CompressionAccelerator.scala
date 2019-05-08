@@ -394,19 +394,13 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     dontTouch(streamCounter)
     dontTouch(streamHolder)
     dontTouch(streamEmpty)
+	dontTouch(finalSWPointerOffset)
 
     // clear the valid bits of the hash table when a new compression job starts
     matchFinder.io.clear := cmd.fire()
 
     // don't use the L1
     io.mem.req.valid := false.B
-
-    // help determine the final compressed length
-    val finalSWPointerOffset = RegInit(0.U(3.W))
-    when(remain === 0.U && memoryctrlIO.storeData.valid && !trueEndEncode) {
-        finalSWPointerOffset := streamCounter
-    }
-
     // send response into rd
     io.resp.valid := prevBusy && !busy
     io.resp.bits.rd := cmd.bits.inst.rd
