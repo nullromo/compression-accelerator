@@ -24,7 +24,6 @@ class CompressionAcceleratorTester(c: ScratchpadTestModule, filename: String) ex
     val dataset: String = filename.split("/").last.split(".txt")(0).split("-")(0)
     println("== type is " + dataset)
     println("== length is " + length)
-
     // set length
     poke(c.io.cmd.bits.inst.funct, 2) // doSetLength
     poke(c.io.cmd.bits.rs1, length) // length = length
@@ -41,9 +40,11 @@ class CompressionAcceleratorTester(c: ScratchpadTestModule, filename: String) ex
     poke(c.io.cmd.valid, false)
 
     // run until the output is valid
-    while (peek(c.io.resp.valid) == 0 && timeout < 100 * length) {
+    while (peek(c.io.resp.valid) == 0 && timeout < 50 * length) {
         step(1)
         timeout += 1
+        if (timeout % 500 == 0)
+            println("running " + timeout + ", max " + 50 * length)
     }
 
     // run a bit longer
@@ -59,15 +60,21 @@ class CompressionAcceleratorSpec extends ChiselFlatSpec {
 
     // get all the input files
     val dir = new File("benchmark/benchmark-data/")
-    //    val files: Array[File] = dir.listFiles().filter(!_.getName.contains("_")).filter(!_.getName.contains("gitkeep"))
-    val files = List(new File("benchmark/benchmark-data/repeating-200.txt"))
+    val files: Array[File] = dir.listFiles().filter(!_.getName.contains("_")).filter(!_.getName.contains("gitkeep"))
+    //    val files: Array[File] = List(new File("benchmark/benchmark-data/repeating-200.txt"))
 
     for (filename <- files.map(_.toString)) {
-        val dutGen: () => ScratchpadTestModule = () => LazyModule(new ScratchpadTest(OpcodeSet.custom3, filename)).module
-        "CompressionAccelerator" should ("run compresison for " + filename) in {
-            Driver.execute(TesterArgs() :+ "CompressionAccelerator", dutGen) {
-                c => new CompressionAcceleratorTester(c, filename)
-            } should be(true)
+        val length: Int = filename.split("-").last.split(".txt")(0).toInt
+        if (length < 500000000) {
+            val dutGen: () => ScratchpadTestModule = () => LazyModule(new ScratchpadTest(OpcodeSet.custom3, filename)).module
+            "CompressionAccelerator" should ("run compresison for " + filename) in {
+                Driver.execute(TesterArgs() :+ "CompressionAccelerator", dutGen) {
+                    c => new CompressionAcceleratorTester(c, filename)
+                } should be(true)
+            }
+        }
+        else {
+            println("skipping")
         }
     }
 }
