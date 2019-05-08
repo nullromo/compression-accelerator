@@ -1,46 +1,9 @@
-Fox
-Socks
-Box
-Knox
-
-Knox in box.
-Fox in socks.
-
-Knox on fox in socks in box.
-
-Socks on Knox and Knox in box.
-
-Fox in socks on box on Knox.
-
-Chicks with bricks come.
-Chicks with blocks come.
-Chicks with bricks and blocks and clocks come.
-
-Look, sir.  Look, sir.  Mr. Knox, sir.
-Let's do tricks with bricks and blocks, sir.
-Let's do tricks with chicks and clocks, sir.
-
-First, I'll make a quick trick brick stack.
-Then I'll make a quick trick block stack.
-
-You can make a quick trick chick stack.
-You can make a quick trick clock stack.
-
-And here's a new trick, Mr. Knox....
-Socks on chicks and chicks on fox.
-Fox on clocks on bricks and blocks.
-Bricks and blocks on Knox on box.
-
-Now we come to ticks and tocks, sir.
-Try to say this Mr. Knox, sir....
-
-Clocks on fox tick.
-Clocks on Knox tock.
-Six sick bricks tick.
-Six sick chicks tock.
-
-Please, sir.  I don't like this trick, sir.
-My tongue isn't quick or slick, sir.
-I get all those ticks and clocks, sir,
-mixed up with the chicks and tocks, sir.
-I 
+Moonmist Transform all Humans. Prevent all combat damage that would be dealt this turn by creatures other than Werewolves and Wolves. (Only double-faced cards can be transformed.)
+Accursed Spirit Intimidate (This creature can't be blocked except by artifact creatures and/or creatures that share a color with it.)
+Wojek Bodyguard Mentor (Whenever this creature attacks, put a +1/+1 counter on target attacking creature with lesser power.)
+Wojek Bodyguard can't attack or block alone.
+Elder of Laurels {3}{G}: Target creature gets +X/+X until end of turn, where X is the number of creatures you control.
+Molten Primordial Haste
+When Molten Primordial enters the battlefield, for each opponent, gain control of up to one target creature that player controls until end of turn. Untap those creatures. They gain haste until end of turn.
+Sunrise Sovereign Other Giant creatures you control get +2/+2 and have trample.
+Conclave Equenaut Convoke (Your creatures can help cast this spell. Each creature you t

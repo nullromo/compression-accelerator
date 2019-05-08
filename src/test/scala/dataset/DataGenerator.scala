@@ -22,7 +22,7 @@ class DataGenerator extends FlatSpec with Matchers {
         val outputDir = "benchmark/benchmark-data/"
 
         // entire text of Fox in Socks
-        val foxInSocksSource = Source.fromFile("data/fox-in-socks.txt")
+        val foxInSocksSource = Source.fromFile("data/all-mtg-cards.txt")
         val foxInSocks = try foxInSocksSource.mkString finally foxInSocksSource.close()
 
         /**
