@@ -22,7 +22,7 @@ class DataGenerator extends FlatSpec with Matchers {
         val outputDir = "benchmark/benchmark-data/"
 
         // entire text of Fox in Socks
-        val foxInSocksSource = Source.fromFile("data/fox-in-socks.txt")
+        val foxInSocksSource = Source.fromFile("data/all-mtg-cards.txt")
         val foxInSocks = try foxInSocksSource.mkString finally foxInSocksSource.close()
 
         /**
@@ -74,7 +74,7 @@ class DataGenerator extends FlatSpec with Matchers {
             // make a list of print writers
             var files: List[PrintWriter] = List()
             for (i <- 0 until 8)
-                files = files :+ new PrintWriter(new File(filename.split(".txt")(0) + "_" + i + ".txt"))
+                files = files :+ new PrintWriter(new File(filename.split(".txt")(0) + "_" + (7-i) + ".txt"))
 
             // copy the data
             for (i <- 0 until (Math.ceil(fileText.length / 8.0) * 8.0).toInt) {

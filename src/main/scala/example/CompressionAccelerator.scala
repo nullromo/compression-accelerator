@@ -167,7 +167,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     matchFinder.io.newData.valid := memoryctrlIO.readScratchpadReady && (remain >= 4.U) && aligner.io.readDataIO.data.valid
     matchFinder.io.newData.bits := aligner.io.readDataIO.data.bits
     // tell the matchFinder to start looking: when scratchpad is ready to read and copy emitter is just not busy
-    matchFinder.io.start.valid := memoryctrlIO.readScratchpadReady && (!copyEmitter.io.copyBusy || (copyEmitter.io.copyBusy && copyEmitter.io.copyCompressed.valid))
+    matchFinder.io.start.valid := memoryctrlIO.readScratchpadReady && (!copyEmitter.io.copyBusy || (copyEmitter.io.copyBusy && copyEmitter.io.copyCompressed.valid)) && !copyEmitter.io.continue
     matchFinder.io.start.bits := DontCare
     forceEmit := ((matchB - nextEmit) > 59.U) && !matchFinder.io.start.ready && !trueEndEncode && nextEmitValid
     matchFinder.io.matchA.ready := true.B
@@ -193,7 +193,7 @@ class CompressionAcceleratorModule(outer: CompressionAccelerator, params: Compre
     }
     copyEmitter.io.offset.bits := offset
     copyEmitter.io.offset.valid := true.B //TODO: is this right? Probably not.
-    copyEmitter.io.hit := realMatchFound
+    copyEmitter.io.hit := realMatchFound || copyEmitter.io.continue
     copyEmitter.io.remain := remain
     copyEmitter.io.bufferPtrInc.ready := true.B
     copyEmitter.io.copyCompressed.ready := true.B

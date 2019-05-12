@@ -60,8 +60,8 @@ class CompressionAcceleratorSpec extends ChiselFlatSpec {
 
     // get all the input files
     val dir = new File("benchmark/benchmark-data/")
-    //    val files: Array[File] = dir.listFiles().filter(!_.getName.contains("_")).filter(!_.getName.contains("gitkeep"))
-    val files = List(new File("benchmark/benchmark-data/real-50000.txt"))
+    val files: Array[File] = dir.listFiles().filter(!_.getName.contains("_")).filter(!_.getName.contains("gitkeep"))
+    //val files = List(new File("benchmark/benchmark-data/repeating-500.txt"))
 
     for (filename <- files.map(_.toString)) {
         val length: Int = filename.split("-").last.split(".txt")(0).toInt

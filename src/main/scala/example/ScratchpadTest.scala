@@ -13,7 +13,7 @@ import chisel3.util.experimental.loadMemoryFromFile
 
 class ScratchpadTest(opcodes: OpcodeSet, val data: String = "")(implicit p: Parameters) extends LazyModule() {
     override lazy val module = new ScratchpadTestModule(this, data)
-    val ram = LazyModule(new TLTestRAM(AddressSet(0, 0xFFFF), beatBytes = 8))
+    val ram = LazyModule(new TLTestRAM(AddressSet(0, 0xFFFFFF), beatBytes = 8))
     val xbar = LazyModule(new TLXbar)
     val accelerator = LazyModule(new CompressionAccelerator(opcodes))
     xbar.node :=* accelerator.tlNode

@@ -30,7 +30,8 @@ class CopyCompressIO(params: CopyCompressParams) extends Bundle {
     val hit = Input(Bool()) // tell the datapath to start compress
     val bufferPtrInc = Decoupled(UInt(log2Ceil(params.parallellane + 1).W))
     val remain = Input(UInt(64.W)) // remaining byte number needs to be compressed
-    val copyBusy = Output(Bool()) // indicator whether the copy path is working 
+    val copyBusy = Output(Bool()) // indicator whether the copy path is working
+	val continue = Output(Bool()) // indicator whether the copy is stopped due to exceed maximum length 
 
     override def cloneType: this.type = CopyCompressIO(params).asInstanceOf[this.type]
 }
@@ -57,6 +58,7 @@ class CopyCompress(val params: CopyCompressParams) extends Module {
     val equal_reg = Reg(Bool())
     val equal_reg_prev = Reg(Bool())
     val copybusyReg = RegInit(false.B)
+	val continue = RegInit(false.B)
     dontTouch(compareResult)
     dontTouch(compareResult_uint)
     dontTouch(num_candidate_valid)
@@ -75,13 +77,19 @@ class CopyCompress(val params: CopyCompressParams) extends Module {
     equal_reg := io.equal
     equal_reg_prev := equal_reg
     io.copyBusy := copybusyReg
+	io.continue := continue && (!copybusyReg || io.copyCompressed.valid)
 
 
-    when(io.hit) {
+    when(io.hit && !copybusyReg) {
         start_reg := true.B
-        lengthAccum := 4.U
+		when(continue){
+       		lengthAccum := 0.U
+		}.otherwise{
+			lengthAccum := 4.U	
+		}
         equal_reg := true.B
         copybusyReg := true.B
+		continue := false.B
         equal_reg_prev := true.B
     }
     .elsewhen(!io.equal) {
@@ -131,7 +139,9 @@ class CopyCompress(val params: CopyCompressParams) extends Module {
                 when((compareResult.asUInt & (pow(2, i + 1) - 1).toInt.U) === (pow(2, i + 1) - 1).toInt.U) {
                     when(lengthAccum < maxLength.U && ((lengthAccum + i.U) < maxLength.U-1.U)) { // 6-bits represents 1-64 same bytes not 0-63
                         io.bufferPtrInc.bits := (i + 1).U
-                    }
+                    }.otherwise{
+						continue := true.B
+					}
                 }
             }
 
