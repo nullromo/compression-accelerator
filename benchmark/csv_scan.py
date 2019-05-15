@@ -1,6 +1,7 @@
 import csv
+import sys
 
-with open('hw_results_big_table.csv') as csvfile:
+with open(sys.argv[1]) as csvfile:
     reader = csv.reader(csvfile, delimiter=';')
     real_dict = dict()
     repeat_dict = dict()

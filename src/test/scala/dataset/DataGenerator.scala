@@ -7,14 +7,22 @@ import org.scalatest.{FlatSpec, Matchers}
 import scala.io.Source
 import scala.util.Random
 
+class RandomFileGenerator extends FlatSpec with Matchers {
+    "pls" should "pls" in {
+        // seeded random number generator
+        val rand = new Random(4444)
+        val wr = new PrintWriter(new File("data/randomASCII.txt"))
+        for(_ <- 0 until 100000)
+            wr.write(rand.nextInt(93) + 32)
+        wr.close()
+    }
+}
+
 /**
   * Generates test input data for compression benchmarking.
   */
 class DataGenerator extends FlatSpec with Matchers {
     "DataGenerator" should "generate benchmark data" in {
-        // seeded random number generator
-        val rand = new Random(4444)
-
         // lengths of files to generate
         val lengths: Seq[Int] = Seq(10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000)
 
@@ -22,8 +30,11 @@ class DataGenerator extends FlatSpec with Matchers {
         val outputDir = "benchmark/benchmark-data/"
 
         // entire text of Fox in Socks
-        val foxInSocksSource = Source.fromFile("data/all-mtg-cards.txt")
-        val foxInSocks = try foxInSocksSource.mkString finally foxInSocksSource.close()
+        val allMTGCardsSource = Source.fromFile("data/all-mtg-cards.txt")
+        val allMTGCards = try allMTGCardsSource.mkString finally allMTGCardsSource.close()
+
+        val randomSource = Source.fromFile("data/randomASCII.txt")
+        val randomData = try randomSource.mkString finally randomSource.close()
 
         /**
           * Generates files of random, real and repeating data
@@ -42,8 +53,8 @@ class DataGenerator extends FlatSpec with Matchers {
 
                 // write the data
                 for (i <- 0 until length) {
-                    randomWriter.write(rand.nextInt(256))
-                    realWriter.write(foxInSocks(i % foxInSocks.length))
+                    randomWriter.write(randomData(i))
+                    realWriter.write(allMTGCards(i))
                     repeatingWriter.write("a")
                 }
 
