@@ -13,3 +13,6 @@
 [submodule "tests/snappy"]
 	path = tests/snappy
 	url = https://github.com/google/snappy
+[submodule "workloads/snappy/overlay/root/snappy"]
+	path = workloads/snappy/overlay/root/snappy
+	url = https://github.com/google/snappy
