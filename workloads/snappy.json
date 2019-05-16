@@ -1,0 +1,6 @@
+{
+    "name": "snappy",
+    "base": "fedora-base.json",
+    "overlay": "overlay",
+    "guest-init": "guest-init.sh"
+}

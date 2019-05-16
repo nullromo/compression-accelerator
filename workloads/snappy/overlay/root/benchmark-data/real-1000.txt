@@ -1,0 +1,9 @@
+Moonmist Transform all Humans. Prevent all combat damage that would be dealt this turn by creatures other than Werewolves and Wolves. (Only double-faced cards can be transformed.)
+Accursed Spirit Intimidate (This creature can't be blocked except by artifact creatures and/or creatures that share a color with it.)
+Wojek Bodyguard Mentor (Whenever this creature attacks, put a +1/+1 counter on target attacking creature with lesser power.)
+Wojek Bodyguard can't attack or block alone.
+Elder of Laurels {3}{G}: Target creature gets +X/+X until end of turn, where X is the number of creatures you control.
+Molten Primordial Haste
+When Molten Primordial enters the battlefield, for each opponent, gain control of up to one target creature that player controls until end of turn. Untap those creatures. They gain haste until end of turn.
+Sunrise Sovereign Other Giant creatures you control get +2/+2 and have trample.
+Conclave Equenaut Convoke (Your creatures can help cast this spell. Each creature you t
