@@ -84,12 +84,12 @@ Aluren Any player may cast creature spells with converted mana cost 3 or less wi
 Aquastrand Spider Graft 2 (This creature enters the battlefield with two +1/+1 counters on it. Whenever another creature enters the battlefield, you may move a +1/+1 counter from this creature onto it.)
 {G}: Target creature with a +1/+1 counter on it gains reach until end of turn. (It can block creatures with flying.)
 Strategy, Schmategy Roll a six-sided die. Strategy, Schmategy has the indicated effect.
-1 — Do nothing.
-2 — Destroy all artifacts.
-3 — Destroy all lands.
-4 — Strategy, Schmategy deals 3 damage to each creature and each player.
-5 — Each player discards their hand and draws seven cards.
-6 — Repeat this process two more times.
+1  Do nothing.
+2  Destroy all artifacts.
+3  Destroy all lands.
+4  Strategy, Schmategy deals 3 damage to each creature and each player.
+5  Each player discards their hand and draws seven cards.
+6  Repeat this process two more times.
 Kranioceros {1}{W}: Kranioceros gets +0/+3 until end of turn.
 Tangle Hulk {2}{G}: Regenerate Tangle Hulk.
 Gnarlid Pack Multikicker {1}{G} (You may pay an additional {1}{G} any number of times as you cast this spell.)
@@ -106,7 +106,7 @@ Khalni Gem When Khalni Gem enters the battlefield, return two lands you control 
 {T}: Add two mana of any one color.
 Liliana, Dreadhorde General Whenever a creature you control dies, draw a card.
 +1: Create a 2/2 black Zombie creature token.
-−4: Each player sacrifices two creatures.
-−9: Each opponent chooses a permanent they control of each permanent type and sacrifices the rest.
+4: Each player sacrifices two creatures.
+9: Each opponent chooses a permanent they control of each permanent type and sacrifices the rest.
 Blinkmoth Well {T}: Add {C}.
 {2}, {T}

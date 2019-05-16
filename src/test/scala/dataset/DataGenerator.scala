@@ -52,10 +52,11 @@ class DataGenerator extends FlatSpec with Matchers {
                 // make a file of all a's
                 val repeatingWriter = new PrintWriter(new File(outputDir + "repeating-" + length + ".txt"))
 
+                println("======" + length)
                 // write the data
                 for (i <- 0 until length) {
                     randomWriter.write(randomData(i))
-                    realWriter.write(allMTGCards(i))
+                    realWriter.write(allMTGCards(i).toByte.toChar)
                     repeatingWriter.write("a")
                 }
 

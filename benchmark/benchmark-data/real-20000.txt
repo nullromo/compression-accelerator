@@ -84,12 +84,12 @@ Aluren Any player may cast creature spells with converted mana cost 3 or less wi
 Aquastrand Spider Graft 2 (This creature enters the battlefield with two +1/+1 counters on it. Whenever another creature enters the battlefield, you may move a +1/+1 counter from this creature onto it.)
 {G}: Target creature with a +1/+1 counter on it gains reach until end of turn. (It can block creatures with flying.)
 Strategy, Schmategy Roll a six-sided die. Strategy, Schmategy has the indicated effect.
-1 — Do nothing.
-2 — Destroy all artifacts.
-3 — Destroy all lands.
-4 — Strategy, Schmategy deals 3 damage to each creature and each player.
-5 — Each player discards their hand and draws seven cards.
-6 — Repeat this process two more times.
+1  Do nothing.
+2  Destroy all artifacts.
+3  Destroy all lands.
+4  Strategy, Schmategy deals 3 damage to each creature and each player.
+5  Each player discards their hand and draws seven cards.
+6  Repeat this process two more times.
 Kranioceros {1}{W}: Kranioceros gets +0/+3 until end of turn.
 Tangle Hulk {2}{G}: Regenerate Tangle Hulk.
 Gnarlid Pack Multikicker {1}{G} (You may pay an additional {1}{G} any number of times as you cast this spell.)
@@ -106,8 +106,8 @@ Khalni Gem When Khalni Gem enters the battlefield, return two lands you control 
 {T}: Add two mana of any one color.
 Liliana, Dreadhorde General Whenever a creature you control dies, draw a card.
 +1: Create a 2/2 black Zombie creature token.
-−4: Each player sacrifices two creatures.
-−9: Each opponent chooses a permanent they control of each permanent type and sacrifices the rest.
+4: Each player sacrifices two creatures.
+9: Each opponent chooses a permanent they control of each permanent type and sacrifices the rest.
 Blinkmoth Well {T}: Add {C}.
 {2}, {T}: Tap target noncreature artifact.
 Ramosian Captain First strike
@@ -130,7 +130,7 @@ When Zacama, Primal Calamity enters the battlefield, if you cast it, untap all l
 {2}{G}: Destroy target artifact or enchantment.
 {2}{W}: You gain 3 life.
 To the Slaughter Target player sacrifices a creature or planeswalker.
-Delirium — If there are four or more card types among cards in your graveyard, instead that player sacrifices a creature and a planeswalker.
+Delirium  If there are four or more card types among cards in your graveyard, instead that player sacrifices a creature and a planeswalker.
 Wall of Fortune Defender
 You may tap an untapped Wall you control to have any player reroll a die that player rolled.
 Swamp Mosquito Flying
@@ -144,9 +144,9 @@ Dreadmalkin Menace (This creature can't be blocked except by two or more creatur
 Day of Judgment Destroy all creatures.
 Read the Bones Scry 2, then draw two cards. You lose 2 life. (To scry 2, look at the top two cards of your library, then put any number of them on the bottom of your library and the rest on top in any order.)
 Master Apothecary Tap an untapped Cleric you control: Prevent the next 2 damage that would be dealt to any target this turn.
-Grenzo, Havoc Raiser Whenever a creature you control deals combat damage to a player, choose one —
-• Goad target creature that player controls.
-• Exile the top card of that player's library. Until end of turn, you may cast that card and you may spend mana as though it were mana of any color to cast that spell.
+Grenzo, Havoc Raiser Whenever a creature you control deals combat damage to a player, choose one 
+" Goad target creature that player controls.
+" Exile the top card of that player's library. Until end of turn, you may cast that card and you may spend mana as though it were mana of any color to cast that spell.
 Overgrown Tomb ({T}: Add {B} or {G}.)
 As Overgrown Tomb enters the battlefield, you may pay 2 life. If you don't, it enters the battlefield tapped.
 Breath of Darigaaz Kicker {2} (You may pay an additional {2} as you cast this spell.)
