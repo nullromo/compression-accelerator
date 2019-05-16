@@ -1,5 +1,7 @@
 #!/usr/bin/python3
 
+# Took 'AllCards.json' from https://mtgjson.com/
+
 import json
 
 with open('AllCards.json') as allCards:
